@@ -1,0 +1,18 @@
+import os
+from datetime import datetime
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv())
+
+KEYS={
+    "palm/chat-bison":os.environ['PALM_API_KEY'],
+    "openai/gpt-3.5-turbo-1106":os.environ['OPENAI_API_KEY']
+}
+
+MODEL = "openai/gpt-3.5-turbo-1106"
+# MODEL = "palm/chat-bison"
+
+STEPCOLS = ['stepId', 'fromId', 'recursion', 'prompt', 'LLMgen', 'cmdIsAdded', 'status', 'remark']
+DBPATH='agentProject%s.csv'%int(datetime.now().timestamp())
+
+SEARCHSITE = 'site: news.yahoo.com'
