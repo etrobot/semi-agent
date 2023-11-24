@@ -42,8 +42,3 @@ def genHtml(data:pd.DataFrame):
     # 将嵌套div字符串写入HTML文件
     with open('UI.html', 'w') as file:
       file.write(htmlcontent)
-
-
-if __name__=='__main__':
-    df=pd.read_csv('../agentProject1700721796.csv')
-    genHtml(df)

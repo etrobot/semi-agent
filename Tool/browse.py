@@ -53,21 +53,26 @@ def search(prompt:str)->str:
         prompt = f'I want to search this info:『{prompt}』,plz make several groups of keywords'
         details = makelist(prompt,subList=True)
     final=[]
-    if 'SOCKSPROXY' in os.environ.keys():
-        ddgs = DDGS(proxies = os.environ['SOCKSPROXY'])
-    else:
-        ddgs = DDGS()
-    for words in details[:5]:
-        print('search:',words)
-        serp=ddgs.text(SEARCHSITE+' '+str(words), max_results=1)
-        links=[r['href'] for r in serp]
-        print('search result:',links)
-        pageSum ='\n'.join(sumPage(link) for link in links)
-        if len(pageSum)<200:
+    def ddg():
+        serp = ddgs.text(SEARCHSITE + ' ' + str(words), max_results=1)
+        links = [r['href'] for r in serp]
+        print('search result:', links)
+        pageSum = '\n'.join(sumPage(link) for link in links)
+        if len(pageSum) < 200:
             sumSum = pageSum
         else:
             sumSum = summarize(pageSum)
-        print('sumSum:',sumSum)
+        print('sumSum:', sumSum)
         final.append(sumSum)
-        t.sleep(30)#ddg limit
+        t.sleep(30)  # ddg limit
+
+    for words in details[:5]:
+        print('search:', words)
+        if 'SOCKSPROXY' in os.environ.keys():
+            with DDGS(proxies = os.environ['SOCKSPROXY']) as ddgs:
+                ddg()
+        else:
+            with DDGS() as ddgs:
+                ddg()
+
     return '\n'.join(makelist('\n'.join(final)))
