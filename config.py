@@ -15,4 +15,4 @@ MODEL = "openai/gpt-3.5-turbo-1106"
 STEPCOLS = ['stepId', 'fromId', 'recursion', 'prompt', 'LLMgen', 'cmdIsAdded', 'status', 'remark']
 DBPATH='agentProject%s.csv'%int(datetime.now().timestamp())
 
-SEARCHSITE = 'site: news.yahoo.com'
+SEARCHSITE = 'site:news.yahoo.com'
