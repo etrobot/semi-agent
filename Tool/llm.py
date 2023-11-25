@@ -29,27 +29,6 @@ def makelist(prompt:str,subList=False):
     print(reply_text.split('\n'))
     return [x for x in reply_text.split('\n') if len(x)>2]
 
-def wechatPost(url:str):
-    res = requests.get(url)
-    soup = BeautifulSoup(res.text, "html.parser")
-    query = soup.get_text(separator="\n")
-    for s in soup(['script', 'style']):
-        s.decompose()
-    soup=soup.find(id='js_content')
-    query1 = [x.get_text(separator='\n') for x in soup.find_all('section')]
-    query2 = [x.get_text(separator='\n') for x in soup.find_all('p')]
-    if len(''.join(query2)) > len(''.join(query1)):
-        query1 = query2
-    if len('\n'.join(query1)) == 0:
-        queryText = re.sub(r'\\x[0-9a-fA-F]{2}', '',
-                           soup.find('meta', {'name': 'description'}).attrs['content'])
-    else:
-        query1 = '\n'.join(query1).split('\n')
-        query = list(set(query1))
-        query.sort(key=query1.index)
-        queryText = '\n'.join(query)
-    print(query[0],len(queryText))
-    return queryText
 def ask(prompt:str):
     return completion(model=MODEL, messages=[{
         "role": "user",
