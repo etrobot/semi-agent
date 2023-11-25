@@ -81,7 +81,7 @@ def cmsK(code:str,type:str='daily'):
     df['percent']=df['percent'].round(4)
     return df
 
-def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒作时间跨度最长的10个产业链(注明起止日期),并列出包含个股(含代码和市值)'):
+def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒作时间跨度最长的10个产业链(注明起止日期),并列出包含个股(含代码、市值和区间振幅)'):
     headers = {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
@@ -132,12 +132,14 @@ def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒�
     df=df[df['重要事件名称']=='涨停'].drop_duplicates(subset=['股票代码'])
     df['股票代码']=df['股票代码'].str[-2:]+df['股票代码'].str[:-3]
     df['重要事件内容'] = df['重要事件内容'].str.split('涨停原因：').apply(lambda x: x[-1].replace('。首板涨停。','') if x else '')
+    df['区间振幅'] = round(pd.to_numeric(df['区间振幅'], errors='coerce'))
+    df['区间振幅'] = df['区间振幅'].astype(str).str[:-2]+'%'
     df['a股市值(不含限售股)'] = round(pd.to_numeric(df['a股市值(不含限售股)'], errors='coerce') / 100000000)
-    df['a股市值(不含限售股)'] = df['a股市值(不含限售股)'].astype(str)+'亿'
+    df['a股市值(不含限售股)'] = df['a股市值(不含限售股)'].astype(str).str[:-2]+'亿'
     df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
-    args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)')
+    args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
     df[list(args)].to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
-    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值\n'+'\n'.join(''.join(x) for x in df.head(50)[list(args)].values.tolist())
+    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(''.join(x) for x in df.head(50)[list(args)].values.tolist())
     return completion(model=MODEL, messages=[{
         "role": "user",
         "content": '『%s』\n%s'%(stockData,prompt),
