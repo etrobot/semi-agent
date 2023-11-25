@@ -1,3 +1,4 @@
+import ast
 import datetime
 import json
 import re
@@ -56,15 +57,17 @@ def ask(prompt:str):
     }], api_key=KEYS[MODEL])["choices"][0]["message"]["content"]
 
 def genPost(prompt:str):
-  prompt+='''\n\nTurn texts above to a blog post,output json format:{
+  prompt+='''\n\nTurn texts above to a blog post,output python dict format:{
     "title":"title",
     "tags":["tag1","tag2",...],
-    "post":"markdown content"
+    "post":"""markdown"""
   }
   '''
-  jsonText=ask(prompt)
-  result=json.loads(jsonText)
-  title,tags,post=result['title'],result['tags'],result['post']
+  text=ask(prompt)
+  if not 'openai' in MODEL:
+      text='{' + text.split('{')[-1].split('}')[0] + '}'
+  result=ast.literal_eval(text)
+  title,tags,post=result['title'],result['tags'], result['post'].replace('  ','')
   # filename="-".join([p[0] for p in pinyin(string, style=Style.NORMAL)])
   template = '''
 ---
@@ -76,7 +79,6 @@ author: {author}
 category: {cate}
 ---\n
 {post}\n\n
-### Reference:
         '''.format(
         title=title,
         date=datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
