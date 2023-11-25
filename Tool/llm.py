@@ -1,3 +1,5 @@
+import datetime
+import json
 import re
 
 import requests
@@ -53,5 +55,34 @@ def ask(prompt:str):
         "content": prompt,
     }], api_key=KEYS[MODEL])["choices"][0]["message"]["content"]
 
-if __name__=='__main__':
-    print(wechatPost('https://mp.weixin.qq.com/s/fVTxYWc4f2x9W710mMQzJA'))
+def genPost(prompt:str):
+  prompt+='''\n\nTurn texts above to a blog post,output json format:{
+    "title":"title",
+    "tags":["tag1","tag2",...],
+    "post":"markdown content"
+  }
+  '''
+  jsonText=ask(prompt)
+  result=json.loads(jsonText)
+  title,tags,post=result['title'],result['tags'],result['post']
+  # filename="-".join([p[0] for p in pinyin(string, style=Style.NORMAL)])
+  template = '''
+---
+title: "{title}"
+date: {date}
+draft: true
+tags: {tags}
+author: {author}
+category: {cate}
+---\n
+{post}\n\n
+### Reference:
+        '''.format(
+        title=title,
+        date=datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
+        tags=str(tags),
+        cate='AGENTs',
+        author='Frank Lin',
+        post=post,
+    )
+  return template
