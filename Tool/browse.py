@@ -101,5 +101,3 @@ def wechatPost(url:str):
     img_tags = soup.find_all('img')
     image_urls = '\n'.join(img.get('data-src','') for img in img_tags)+'\n'
     return image_urls,queryText
-
-print(wechatPost('https://mp.weixin.qq.com/s/fVTxYWc4f2x9W710mMQzJA'))
