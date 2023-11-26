@@ -1,14 +1,14 @@
 import json
 import os
 import re
-from copy import deepcopy
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor,wait
 from urllib import parse
 from config import MODEL,KEYS
 from litellm import completion
 import pandas as pd
 import requests
 import time as t
+import demjson3
 
 def vikaData(id:str):
     headersVika = {
@@ -49,10 +49,10 @@ def crawl_data_from_wencai(headers:dict,data:dict):
         data['page']=page
         response = requests.post('https://www.iwencai.com/gateway/urp/v7/landing/getDataList', headers=headers, data=data)
         if response.status_code == 200:
-            print(df_data['page'],'/',df_data['max'],response.text[:99])
             df_data=parse_wencai(response.json())
             if max==0:
                 max=df_data['max']
+            print(df_data['page'],'/',df_data['max'],response.text[:99])
             df=pd.concat([df,df_data['df']])
         else:
             print("连接访问接口失败")
@@ -60,39 +60,67 @@ def crawl_data_from_wencai(headers:dict,data:dict):
             break
     df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
     return df
-def cmsK(code:str,type:str='daily'):
-    """招商证券A股行情数据"""
-    typeNum={'daily':1,'monthly':3,'weekly':2}
-    code=code.upper()
-    quoFile = 'Quotation/' + code + '.csv'
-    if len(code)==8:
-        code = code[:2] + ':'+code[2:]
-    params = (
-        ('funcno', 20050),
-        ('version', '1'),
-        ('stock_list', code),
-        ('count', '10000'),
-        ('type', typeNum[type]),
-        ('field', '1:2:3:4:5:6:7:8:9:10:11:12:13:14:15:16:18:19'),
-        ('date', datetime.now().strftime("%Y%m%d")),
-        ('FQType', '2'),#不复权1，前复权2，后复权3
-    )
-    url='https://hq.cmschina.com/market/json?'+parse.urlencode(params)
-    kjson=json.loads(getUrl(url))
-    if 'results' not in kjson.keys() or  len(kjson['results'])==0:
-        return []
-    data = kjson['results'][0]['array']
-    df=pd.DataFrame(data=data,columns=['date','open','high','close','low','yesterday','volume','amount','price_chg','percent','turnoverrate','ma5','ma10','ma20','ma30','ma60','afterAmt','afterVol'])
-    df.set_index('date',inplace=True)
-    df.index=pd.to_datetime(df.index,format='%Y%m%d')
-    df=df.apply(pd.to_numeric, errors='coerce').fillna(df)
-    # if type=='daily':
-    #     df.to_csv(quoFile,encoding='utf-8',index_label='date',date_format='%Y-%m-%d')
-    df['percent']=df['percent'].round(4)
-    return df
+def tencentK(mkt:str = '',symbol: str = "sh000001",period='day') -> pd.DataFrame:
+    # symbol=symbol.lower()
+    # A股的mkt为''
+    if mkt=='us' and '.' not in symbol:
+        symbolTxt=requests.get(f"http://smartbox.gtimg.cn/s3/?q={symbol}&t=us").text
+        symbol = mkt + symbolTxt.split("~")[1].upper()
+    elif mkt=='hk':
+        symbol=mkt+symbol
+    """
+        腾讯证券-获取有股票数据的第一天, 注意这个数据是腾讯证券的历史数据第一天
+        http://gu.qq.com/usQQQ.OQ/
+        :param symbol: 带市场标识的股票代码
+        :type symbol: str
+        :return: 开始日期
+        :rtype: pandas.DataFrame
+        """
+    headers = {"user-agent": "Mozilla", "Connection": "close"}
+    url = "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
+    if mkt=='us':
+        url = "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?"
+    temp_df = pd.DataFrame()
+    url_list=[]
+    params = {
+        "_var": f"kline_{period}qfq",
+        "param": f"{symbol},{period},,,320,qfq",
+        "r": "0.012820108110342066",
+    }
+    url_list.append(url + parse.urlencode(params))
+    # print(url_list)
+    with ThreadPoolExecutor(max_workers=10) as executor:  # optimally defined number of threads
+        responeses = [executor.submit(getUrl, url) for url in url_list]
+        wait(responeses)
 
-def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒作时间跨度最长的10个产业链(注明起止日期),并列出包含个股(含代码、市值和区间振幅)',iwcToken='0ac9665e17010080213476681',model='openai/gpt-3.5-turbo-1106'):
-    idx = cmsK('sh000001')
+    for res in responeses:
+        text=res.result()
+        try:
+            inner_temp_df = pd.DataFrame(
+                demjson3.decode(text[text.find("={") + 1:])["data"][symbol][period]
+            )
+        except:
+            inner_temp_df = pd.DataFrame(
+                demjson3.decode(text[text.find("={") + 1:])["data"][symbol]["qfq%s"%period]
+            )
+        temp_df = pd.concat([temp_df, inner_temp_df],ignore_index=True)
+
+    if temp_df.shape[1] == 6:
+        temp_df.columns = ["date", "open", "close", "high", "low", "amount"]
+    else:
+        temp_df = temp_df.iloc[:, :6]
+        temp_df.columns = ["date", "open", "close", "high", "low", "amount"]
+    temp_df.index = pd.to_datetime(temp_df["date"])
+    del temp_df["date"]
+    temp_df = temp_df.astype("float")
+    temp_df.drop_duplicates(inplace=True)
+    temp_df.rename(columns={'amount':'volume'}, inplace = True)
+    # temp_df.to_csv('Quotation/'+symbol+'.csv',encoding='utf-8',index_label='date',date_format='%Y-%m-%d')
+    return temp_df
+
+
+def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒作时间跨度最长的10个产业链(注明起止日期),并列出包含个股(含代码、市值和区间振幅)',iwcToken='',model='openai/gpt-3.5-turbo-1106'):
+    idx = tencentK('sh000001')
     headers = {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
@@ -159,13 +187,13 @@ def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒�
 
 
 def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-1106'):
-    idx=cmsK('sh000001')
+    idx=tencentK('sh000001')
     print(idx.index[-1].strftime('%Y%m%d'))
     # print(idxdate.strftime('%Y%m%d'))
     cookies = {
         'Hm_lvt_78c58f01938e4d85eaf619eae71b4ed1': '1640619309,1642582805',
         'hxmPid': '',
-        'v': 'A0aSl97zW6psJw9OiWEn2CdlkTfNp4vvXOm-xTBvMghEJ-jpmDfacSx7DtgD',
+        'v': 'A3mxy4iUODTC-eSfUy3u4h6-ju5Whm-wV3iRo5uu9LIe4ZcQ49Z9COfKoYIo',
     }
     params = (
         ('page', '1'),
@@ -191,4 +219,3 @@ def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-
 
 # if __name__=='__main__':
 #     print(cnHotStock())
-#     print(cnHotStockLatest())
