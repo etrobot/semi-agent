@@ -218,4 +218,4 @@ def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-
         }], api_key=KEYS[model])["choices"][0]["message"]["content"]
 
 # if __name__=='__main__':
-#     print(cnHotStock())
+#     print(cnHotStockLatest(model='openai/gpt-4-1106-preview'))

@@ -3,5 +3,6 @@ duckduckgo-search
 beautifulsoup4
 python-dotenv
 requests
+demjson3
 litellm
 pandas
