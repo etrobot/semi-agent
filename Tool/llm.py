@@ -84,9 +84,7 @@ def genPlan(prompt:str)->str:
         except Exception as e:
             print(e)
     text2json=json.loads(text)
-    print(text2json)
     df=pd.DataFrame(text2json['steps']).sort_values(['step'])
-    print(df)
     df=df.drop('step', axis=1)
     df.columns=['Prompt','Agent']
     df['Conclusion']=''
