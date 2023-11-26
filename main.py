@@ -21,4 +21,5 @@ def run(filename:str):
     df.to_csv(filename, index=False, encoding='utf_8_sig')
 
 if __name__=='__main__':
+  #you can use run(filename) to run the existing plan csv
   run(genPlan('write a news post about MSFT and OpenAI'))

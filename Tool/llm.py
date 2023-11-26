@@ -79,7 +79,8 @@ def genPlan(prompt:str)->str:
     print(text)
     if not 'openai' in MODEL:
         try:
-            text = '{' + ''.join(''.join(text.split('{')[1:]).split('}')[:-1]) + '}'
+            text = '{' + '}'.join('{'.join(text.split('{')[1:]).split('}')[:-1]) + '}'
+            print(text)
         except Exception as e:
             print(e)
     text2json=json.loads(text)
