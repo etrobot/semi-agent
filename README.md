@@ -13,6 +13,7 @@
 ![Google Sheets as GUI](https://github.com/etrobot/semi-agent/assets/3889058/68848daf-329c-49d3-9a21-c8d055ad3f46)
 
 ## How to use
+* ```pip install -r requirements.txt```
 * create a .env file manually at project folder root. add the model and key like:
 ```
 MODEL="openai/gpt-3.5-turbo-1106"
