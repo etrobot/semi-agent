@@ -3,12 +3,14 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor,wait
 from urllib import parse
-from config import MODEL,KEYS
+from config import KEYS
 from litellm import completion
 import pandas as pd
 import requests
 import time as t
 import demjson3
+from datetime import datetime
+import io
 
 def vikaData(id:str):
     headersVika = {
@@ -119,7 +121,7 @@ def tencentK(mkt:str = '',symbol: str = "sh000001",period='day') -> pd.DataFrame
     return temp_df
 
 
-def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒作时间跨度最长的10个产业链(注明起止日期),并列出包含个股(含代码、市值和区间振幅)',iwcToken='',model='openai/gpt-3.5-turbo-1106'):
+def cnHotStock(prompt:str='''按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',iwcToken='',model='openai/gpt-3.5-turbo-1106'):
     idx = tencentK('sh000001')
     headers = {
         'Accept': 'application/json, text/plain, */*',
@@ -167,10 +169,8 @@ def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒�
         df[col] = pd.to_numeric(df[col], errors='coerce')
     df=df.sort_values(by=['区间振幅','涨停次数','a股市值(不含限售股)'],ascending=False)
     df=df[df['重要事件名称']=='涨停'].drop_duplicates(subset=['股票代码'])
-    # df['股票代码'] = df['股票代码'].str[-2:]+df['股票代码'].str[:-3]
-    df['重要事件公告时间'] = pd.to_datetime(df['重要事件公告时间'], format='%Y%m%d')
-    df['股票代码'] = df['股票代码'].str[:-3]
-    df['重要事件公告时间'] = df.apply(lambda x: str(idx.index[idx.index.get_loc(x['重要事件公告时间'])-x['涨停次数']]), axis=1)
+    df['股票代码'] = df['股票代码'].str[-2:]+df['股票代码'].str[:-3]
+    df['重要事件公告时间'] = df.apply(lambda x: str(idx.index[idx.index.get_loc(datetime.strptime(x['重要事件公告时间'], '%Y%m%d'))-x['涨停次数']]), axis=1)
     df['重要事件内容'] = df['重要事件内容'].str.split('涨停原因：').apply(lambda x: x[-1].replace('。首板涨停。','') if x else '')
     df['区间振幅'] = round(pd.to_numeric(df['区间振幅'], errors='coerce'))
     df['区间振幅'] = df['区间振幅'].astype(str).str[:-2]+'%'
@@ -180,10 +180,14 @@ def cnHotStock(prompt:str='按炒作题材的产业链进行分类，选出炒�
     args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
     df[list(args)].to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
     stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(''.join(x) for x in df.head(50)[list(args)].values.tolist())
-    return completion(model=model, messages=[{
-        "role": "user",
-        "content": '『%s』\n%s'%(stockData,prompt),
-    }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+    result = completion(
+        model=model,
+        messages=[{
+            "role": "user",
+            "content": '『%s』\n%s'%(stockData,prompt),
+        }],
+        api_key=KEYS[model])["choices"][0]["message"]["content"]
+    return result
 
 
 def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-1106'):
@@ -212,10 +216,12 @@ def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-
     df['currency_value'] = df['currency_value'].astype(str).str[:] + '亿'
     df=df.fillna('')
     stockData='\n'.join(','.join(x) for x in df[['name', 'code', 'reason_type','high_days','currency_value']].values.tolist())
-    return completion(model=model, messages=[{
+    result = completion(model=model, messages=[{
             "role": "user",
             "content": '『%s』\n%s'%(stockData,prompt),
         }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+    return result
 
 # if __name__=='__main__':
-#     print(cnHotStockLatest(model='openai/gpt-4-1106-preview'))
+#     df=pd.read_csv(io.StringIO(cnHotStock(iwcToken='0ac9665217010766879282200')))
+#     print(df)
