@@ -3,14 +3,13 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor,wait
 from urllib import parse
-from config import KEYS
-from litellm import completion
+from config import KEYS,MODEL
 import pandas as pd
 import requests
 import time as t
 import demjson3
 from datetime import datetime
-import io
+from llm import ask
 
 def vikaData(id:str):
     headersVika = {
@@ -133,7 +132,7 @@ def groupby2html(df:pd.DataFrame,key:str)->str:
                 html_table = html_table.replace('temp', f'<td rowspan={count}>{industry}</td>', 1)
     return html_table
 
-def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',iwcToken='',model='openai/gpt-3.5-turbo-1106',count=30):
+def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',model=MODEL,iwcToken='',count=30):
     idx = tencentK('sh000001')
     headers = {
         'Accept': 'application/json, text/plain, */*',
@@ -193,16 +192,10 @@ def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进
     args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
     df=df[list(args)].head(count)
     stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(' '.join(x) for x in df.values.tolist()).replace(' 00:00:00','')
-    result = completion(
-        model=model,
-        messages=[{
-            "role": "user",
-            "content": '『%s』\n%s'%(stockData,prompt),
-        }],
-        api_key=KEYS[model])["choices"][0]["message"]["content"]
+    result = ask('『%s』%s'%(stockData,prompt),model)
     return result
 
-def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-1106'):
+def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
     idx=tencentK('sh000001')
     print(idx.index[-1].strftime('%Y%m%d'))
     # print(idxdate.strftime('%Y%m%d'))
@@ -228,11 +221,8 @@ def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-
     df['currency_value'] = df['currency_value'].astype(str).str[:] + '亿'
     df=df.fillna('')
     stockData='\n'.join(','.join(x) for x in df[['name', 'code', 'reason_type','high_days','currency_value']].values.tolist())
-    result = completion(model=model, messages=[{
-            "role": "user",
-            "content": '『%s』\n%s'%(stockData,prompt),
-        }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+    result = ask('『%s』\n%s'%(stockData,prompt),model)
     return result
 
-if __name__=='__main__':
-    print(cnHotStock(iwcToken='0ac9666a17011559005045400'))
+# if __name__=='__main__':
+#     print(cnHotStock(iwcToken='0ac9666a17011559005045400'))

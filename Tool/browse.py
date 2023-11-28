@@ -7,9 +7,9 @@ from bs4 import BeautifulSoup
 from requests.cookies import RequestsCookieJar
 from Tool.llm import summarize,makelist
 from duckduckgo_search import DDGS
-from config import SEARCHSITE
+from config import SEARCHSITE,MODEL
 
-def sumPage(url: str) -> str:
+def sumPage(url: str,model=MODEL) -> str:
     print('Sum:',url)
     def dealCookies(cookies):
         cookie_jar = RequestsCookieJar()
@@ -41,13 +41,13 @@ def sumPage(url: str) -> str:
             if len(element.text) > 5
         ]
         txt=' '.join(elements)
-        return txt
+        return summarize(txt,model)
 
     except Exception as e:
         print(e)
         return ''
 
-def search(prompt:str)->str:
+def search(prompt:str,model=MODEL)->str:
     details=[prompt]
     print(details)
     if len(prompt)>50:
@@ -62,7 +62,7 @@ def search(prompt:str)->str:
         if len(pageSum) < 200:
             sumSum = pageSum
         else:
-            sumSum = summarize(pageSum)
+            sumSum = summarize(pageSum,model)
         print('sumSum:', sumSum)
         final.append(sumSum)
         t.sleep(30)  # ddg limit
@@ -76,7 +76,7 @@ def search(prompt:str)->str:
             with DDGS() as ddgs:
                 ddg()
 
-    return '\n'.join(makelist('\n'.join(final)))
+    return '\n'.join(makelist('\n'.join(final),model))
 
 def wechatPost(url:str):
     res = requests.get(url)

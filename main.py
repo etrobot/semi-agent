@@ -1,9 +1,9 @@
 import re
-from Tool.browse import search
+from config import MODEL
 from Tool.textDealer import letterNnum
-from Tool.llm import genPost,summarize,makelist,genPlan
+from Tool.llm import genPlan
 import pandas as pd
-
+import numpy as np
 def run(filename:str):
   input('Input anything and hit Enter to Run when finishing plan sheet editing: ')
   df=pd.read_csv(filename).dropna(subset=['Prompt','Agent'])
@@ -16,7 +16,10 @@ def run(filename:str):
       letter,num=letterNnum(p)
       prompt=prompt.replace(p,df[letter].values[num-1])
     print('Step',k,prompt)
-    result=eval(v['Agent'])(prompt)
+    model=v['Model']
+    if model is None or model=='' or np.isnan(model):
+      model=MODEL
+    result=eval(v['Agent'])(prompt,model)
     df.at[k,'Conclusion']=str(result)
     df.to_csv(filename, index=False, encoding='utf_8_sig')
 
