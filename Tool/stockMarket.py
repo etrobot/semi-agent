@@ -9,7 +9,7 @@ import requests
 import time as t
 import demjson3
 from datetime import datetime
-from llm import ask
+from Tool.llm import ask
 
 def vikaData(id:str):
     headersVika = {
