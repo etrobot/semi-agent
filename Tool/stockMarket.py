@@ -133,7 +133,7 @@ def groupby2html(df:pd.DataFrame,key:str)->str:
                 html_table = html_table.replace('temp', f'<td rowspan={count}>{industry}</td>', 1)
     return html_table
 
-def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',iwcToken='',model='openai/gpt-3.5-turbo-1106'):
+def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',iwcToken='',model='openai/gpt-3.5-turbo-1106',count=30):
     idx = tencentK('sh000001')
     headers = {
         'Accept': 'application/json, text/plain, */*',
@@ -191,8 +191,9 @@ def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进
     df['a股市值(不含限售股)'] = df['a股市值(不含限售股)'].astype(str).str[:-2]+'亿'
     df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
     args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
-    df[list(args)].to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
-    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(''.join(x) for x in df.head(50)[list(args)].values.tolist())
+    df=df[list(args)].head(count)
+    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(''.join(x) for x in df.values.tolist()).replace(' 00:00:00','')
+    print(stockData)
     result = completion(
         model=model,
         messages=[{
@@ -234,7 +235,5 @@ def cnHotStockLatest(prompt:str='分类产业链',model = 'openai/gpt-3.5-turbo-
         }], api_key=KEYS[model])["choices"][0]["message"]["content"]
     return result
 
-# if __name__=='__main__':
-#     df=pd.read_csv(io.StringIO(cnHotStock(iwcToken='0ac9667817011007972208849')))
-#     print(df)
-#     print(groupby2html(df,'产业链'))
+if __name__=='__main__':
+    print(cnHotStock(iwcToken='0ac9666a17011559005045400'))
