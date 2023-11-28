@@ -192,8 +192,7 @@ def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进
     df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
     args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
     df=df[list(args)].head(count)
-    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(''.join(x) for x in df.values.tolist()).replace(' 00:00:00','')
-    print(stockData)
+    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(' '.join(x) for x in df.values.tolist()).replace(' 00:00:00','')
     result = completion(
         model=model,
         messages=[{
