@@ -10,38 +10,32 @@ from bs4 import BeautifulSoup
 from config import MODEL,KEYS
 from litellm import completion
 
-def ask(prompt:str):
-    return completion(model=MODEL, messages=[{
+def ask(prompt:str,model=MODEL):
+    return completion(model=model, messages=[{
         "role": "user",
         "content": prompt,
-    }], api_key=KEYS[MODEL])["choices"][0]["message"]["content"]
-def summarize(text:str):
+    }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+def summarize(text:str,model=MODEL):
     print(len(text))
-    return ask('『%s』TLDR;'%text)
+    return ask('『%s』TLDR;'%text,model=model)
 
-def makelist(prompt:str,subList=False):
+def makelist(prompt:str,subList=False,model=MODEL):
     suffix =' Output points with index'
     if subList:
         suffix=' and output "\nkeyword1 keyword2 keyword3\nkeyword4 keyword5 keyword6\n...",do not output any punctuation or symbol'
-    msg = [{
-        "role": "user",
-        "content": prompt + suffix,
-    }]
-    print('with suffix:',prompt + suffix)
-    response = completion(model=MODEL, messages=msg, api_key=KEYS[MODEL])
-    reply_text = response["choices"][0]["message"]["content"]
+    reply_text = ask(prompt + suffix,model=model)
     print(reply_text.split('\n'))
     return [x for x in reply_text.split('\n') if len(x)>2]
 
-def genPost(prompt:str):
+def genPost(prompt:str,model=MODEL):
   prompt+='''\n\nTurn texts above to a blog post,output python dict format:{
     "title":"title",
     "tags":["tag1","tag2",...],
     "post":"""markdown"""
   }
   '''
-  text=ask(prompt)
-  if not 'openai' in MODEL:
+  text=ask(prompt,model=model)
+  if not 'openai' in model:
       text='{' + text.split('{')[-1].split('}')[0] + '}'
   result=ast.literal_eval(text)
   title,tags,post=result['title'],result['tags'], result['post'].replace('  ','')
@@ -66,7 +60,7 @@ category: {cate}
     )
   return template
 
-def genPlan(prompt:str)->str:
+def genPlan(prompt:str,model=MODEL)->str:
     prompt+='''
     for this mission,make steps of thoughts with json format like{
     "steps":[
@@ -75,9 +69,9 @@ def genPlan(prompt:str)->str:
         ...
     ]},the tools are search/summarize/makelist and just can use one tool every step, dont add any other tool.
     '''
-    text = ask('Mission:'+prompt)
+    text = ask('Mission:'+prompt,model=model)
     print(text)
-    if not 'openai' in MODEL:
+    if not 'openai' in model:
         try:
             text = '{' + '}'.join('{'.join(text.split('{')[1:]).split('}')[:-1]) + '}'
             print(text)
