@@ -5,7 +5,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from requests.cookies import RequestsCookieJar
-from Tool.llm import summarize,makelist
+from Tool.llm import summarize,make_list
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
 
@@ -52,7 +52,7 @@ def search(prompt:str,model=MODEL)->str:
     print(details)
     if len(prompt)>50:
         prompt = f'I want to search this info:『{prompt}』,plz make several groups of keywords'
-        details = makelist(prompt,subList=True)
+        details = make_list(prompt,subList=True)
     final=[]
     def ddg():
         serp = ddgs.text(SEARCHSITE + ' ' + str(words), max_results=1)
@@ -76,7 +76,7 @@ def search(prompt:str,model=MODEL)->str:
             with DDGS() as ddgs:
                 ddg()
 
-    return '\n'.join(makelist('\n'.join(final),model))
+    return '\n'.join(make_list('\n'.join(final),model))
 
 def wechatPost(url:str):
     res = requests.get(url)

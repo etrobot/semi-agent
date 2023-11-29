@@ -3,7 +3,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor,wait
 from urllib import parse
-from config import KEYS,MODEL
+from config import MODEL
 import pandas as pd
 import requests
 import time as t
