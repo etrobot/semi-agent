@@ -54,8 +54,10 @@ def search(prompt:str,model=MODEL)->str:
         prompt = f'I want to search this info:『{prompt}』,plz make several groups of keywords'
         details = make_list(prompt,subList=True)
     final=[]
-    def ddg():
-        serp = ddgs.text(SEARCHSITE + ' ' + str(words), max_results=1)
+    def ddg(searchsite=SEARCHSITE):
+        if 'SEARCHSITE' in os.environ.keys():
+            searchsite=os.environ['SEARCHSITE']
+        serp = ddgs.text(searchsite + ' ' + str(words), max_results=1)
         links = [r['href'] for r in serp]
         print('search result:', links)
         pageSum = '\n'.join(sumPage(link) for link in links)
