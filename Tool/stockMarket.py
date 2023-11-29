@@ -195,10 +195,7 @@ def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进
     result = ask('『%s』%s'%(stockData,prompt),model)
     return result
 
-def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
-    idx=tencentK('sh000001')
-    print(idx.index[-1].strftime('%Y%m%d'))
-    # print(idxdate.strftime('%Y%m%d'))
+def uplimit10jqka(date:str='20231231'):
     cookies = {
         'Hm_lvt_78c58f01938e4d85eaf619eae71b4ed1': '1640619309,1642582805',
         'hxmPid': '',
@@ -209,14 +206,21 @@ def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
         ('limit', '1600'),
         ('field', '199112,10,9001,330323,330324,330325,9002,330329,133971,133970,1968584,3475914,9003,9004'),
         ('filter', 'HS,GEM2STAR'),
-        ('date', idx.index[-1].strftime('%Y%m%d')),
+        ('date', date),
         ('order_field', '330329'),
         ('order_type', '0'),
         ('_', '1643899326926'),
     )
-    response = requests.get('https://data.10jqka.com.cn/dataapi/limit_up/limit_up_pool',headers={"user-agent": "Mozilla"}, params=params, cookies=cookies)
-    result=response.json()['data']['info']
-    df=pd.DataFrame(result)
+    response = requests.get('https://data.10jqka.com.cn/dataapi/limit_up/limit_up_pool',
+                            headers={"user-agent": "Mozilla"}, params=params, cookies=cookies)
+    result = response.json()['data']['info']
+    df = pd.DataFrame(result)
+    return df
+
+def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
+    idx=tencentK('sh000001')
+    print(idx.index[-1].strftime('%Y%m%d'))
+    df=uplimit10jqka(idx.index[-1].strftime('%Y%m%d'))
     df['currency_value'] = round(pd.to_numeric(df['currency_value'], errors='coerce') / 100000000)
     df['currency_value'] = df['currency_value'].astype(str).str[:] + '亿'
     df=df.fillna('')
