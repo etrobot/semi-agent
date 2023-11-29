@@ -17,6 +17,8 @@ def ask(prompt:str,model=MODEL):
     }], api_key=KEYS[model])["choices"][0]["message"]["content"]
 def summarize(text:str,model=MODEL):
     print(len(text))
+    if len(text)<100:
+        return text
     return ask('『%s』TLDR;'%text,model=model)
 
 def make_list(prompt:str,subList=False,model=MODEL):
