@@ -3,7 +3,6 @@ from config import MODEL
 from Tool.textDealer import letterNnum
 from Tool.llm import genPlan
 import pandas as pd
-import numpy as np
 def run(filename:str):
   input('Input anything and hit Enter to Run when finishing plan sheet editing: ')
   df=pd.read_csv(filename).dropna(subset=['Prompt','Agent'])
@@ -17,7 +16,7 @@ def run(filename:str):
       prompt=prompt.replace(p,df[letter].values[num-1])
     print('Step',k,prompt)
     model=v['Model']
-    if model is None or model=='' or np.isnan(model):
+    if model is None or model=='' or str(model)=='NaN':
       model=MODEL
     result=eval(v['Agent'])(prompt,model)
     df.at[k,'Conclusion']=str(result)
@@ -25,4 +24,4 @@ def run(filename:str):
 
 if __name__=='__main__':
   #you can use run(filename) to run the existing plan csv
-  run(genPlan('write a news post about MSFT and OpenAI'))
+  run(genPlan('how to analyze an AI startup'))

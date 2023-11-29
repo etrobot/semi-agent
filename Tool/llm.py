@@ -19,7 +19,7 @@ def summarize(text:str,model=MODEL):
     print(len(text))
     return ask('『%s』TLDR;'%text,model=model)
 
-def makelist(prompt:str,subList=False,model=MODEL):
+def make_list(prompt:str,subList=False,model=MODEL):
     suffix =' Output points with index'
     if subList:
         suffix=' and output "\nkeyword1 keyword2 keyword3\nkeyword4 keyword5 keyword6\n...",do not output any punctuation or symbol'
@@ -67,16 +67,15 @@ def genPlan(prompt:str,model=MODEL)->str:
         {"step":1,"thought":"get info about","tool":"search"},
         {"step":2,"thought":"{{Conclusion 1}} summary","tool":"summarize"},
         ...
-    ]},the tools are search/summarize/makelist and just can use one tool every step, dont add any other tool.
+    ]},the tools are search/summarize/make_list and just can use one tool every step, dont add any other tool.
     '''
     text = ask('Mission:'+prompt,model=model)
     print(text)
-    if not 'openai' in model:
-        try:
-            text = '{' + '}'.join('{'.join(text.split('{')[1:]).split('}')[:-1]) + '}'
-            print(text)
-        except Exception as e:
-            print(e)
+    try:
+        text = '{' + '}'.join('{'.join(text.split('{')[1:]).split('}')[:-1]) + '}'
+        print(text)
+    except Exception as e:
+        print(e)
     text2json=json.loads(text)
     df=pd.DataFrame(text2json['steps']).sort_values(['step'])
     df=df.drop('step', axis=1)
@@ -84,8 +83,8 @@ def genPlan(prompt:str,model=MODEL)->str:
     df['Conclusion']=''
     df['Skip']=''
     for k,v in df.iterrows():
-        if v['Agent']=='summarize':
-            df.at[k,'Prompt']='{{Conclusion %s}}'%k+v['Prompt']
+        if k>0:
+            df.at[k,'Prompt']='{{Conclusion %s}}'%(k+1)+v['Prompt']
     filename='agentMission%s.csv'%datetime.datetime.now().strftime('%Y%m%d-%H_%M')
     df.to_csv(filename, index=False, encoding='utf_8_sig')
     return filename
