@@ -25,7 +25,7 @@ def make_list(prompt:str,subList=False,model=MODEL):
         suffix=' and output "\nkeyword1 keyword2 keyword3\nkeyword4 keyword5 keyword6\n...",do not output any punctuation or symbol'
     reply_text = ask(prompt + suffix,model=model)
     print(reply_text.split('\n'))
-    return [x for x in reply_text.split('\n') if len(x)>2]
+    return [x for x in reply_text.split('\n') if len(x)>2 and sum(int(y in x) for y in prompt)>0]
 
 def genPost(prompt:str,model=MODEL):
   prompt+='''\n\nTurn texts above to a blog post,output python dict format:{
