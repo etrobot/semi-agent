@@ -64,16 +64,21 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
 
         if response.status_code == 200:
             json = response.json()
-            df_data = pd.DataFrame(json["data"]["data"])
+            df = pd.DataFrame(json["data"]["data"])
             # 规范返回的columns，去掉[xxxx]内容,并将重复的命名为.1.2...
-            cols = pd.Series([re.sub(r'\[[^)]*\]', '', col) for col in pd.Series(df_data.columns)])
+            cols = pd.Series([re.sub(r'\[[^)]*\]', '', col) for col in pd.Series(df.columns)])
             for dup in cols[cols.duplicated()].unique():
                 cols[cols[cols == dup].index.values.tolist()] = [dup + '.' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
-            df_data.columns=cols
+            df.columns=cols
+            for c in ['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']:
+                if c in cols:
+                    df[c]=pd.to_numeric(df[c], errors='coerce')
             if len(p)>1 and len(p[1])>10:
-                df_data=df_data[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
-                return ask("『%s』\n%s"%(df_data.head(30).to_csv(index=False),p[1]),model)
-            return df_data
+                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
+                df['股票代码']=df['股票代码'][:-3]
+                df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%int(x/10000000))
+                return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
+            return df
         else:
             print("连接访问接口失败")
     except Exception as e:
@@ -181,6 +186,3 @@ def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
     stockData='\n'.join(','.join(x) for x in df[['name', 'code', 'reason_type','high_days','currency_value']].values.tolist())
     result = ask('『%s』\n%s'%(stockData,prompt),model)
     return result
-
-# if __name__=='__main__':
-#     print(crawl_data_from_wencai())
