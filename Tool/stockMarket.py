@@ -70,13 +70,15 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
             for dup in cols[cols.duplicated()].unique():
                 cols[cols[cols == dup].index.values.tolist()] = [dup + '.' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
             df.columns=cols
-            for c in ['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']:
-                if c in cols:
+            df['股票代码'] = df['股票代码'].str[7:] + df['股票代码'].str[:6]
+            for c in ['最新价', '最新涨跌幅', 'a股市值(不含限售股)']:
+                if c in cols.values:
                     df[c]=pd.to_numeric(df[c], errors='coerce')
             if len(p)>1 and len(p[1])>10:
                 df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
-                df['股票代码']=df['股票代码'][:-3]
-                df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%int(x/10000000))
+                df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%(int(x/10000000)))
+                print(df)
+
                 return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
             return df
         else:
