@@ -76,7 +76,7 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
                     df[c]=pd.to_numeric(df[c], errors='coerce')
             if len(p)>1 and len(p[1])>10:
                 df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
-                df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%(int(x/10000000)))
+                df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%(int(x/100000000)))
                 return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
             return df
         else:
