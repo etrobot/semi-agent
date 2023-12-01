@@ -2,6 +2,7 @@ import json
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor,wait
+from copy import deepcopy
 from urllib import parse
 from config import MODEL
 import pandas as pd
@@ -33,34 +34,50 @@ def getUrl(url,cookie=''):
             retryTimes += 1
             continue
 
-def parse_wencai(response:json):
-    json = response["answer"]["components"][0]["data"]
-    max = int(int(json["meta"]['extra']['row_count']) / 100) + 1
-    page = int(json["meta"]['page'])
-    df_data = pd.DataFrame(json["datas"])
-    cols = pd.Series([re.sub(r'\[[^)]*\]', '', col) for col in pd.Series(df_data.columns)])
-    df_data.columns = cols
-    return {'page':page,'max':max,'df':df_data}
-def crawl_data_from_wencai(headers:dict,data:dict):
-    max=0
-    page=0
-    df=pd.DataFrame()
-    while page<99:
-        page+=1
-        data['page']=page
-        response = requests.post('https://www.iwencai.com/gateway/urp/v7/landing/getDataList', headers=headers, data=data)
+def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，近15日涨幅>0，换手率正序，不支持融资融券，所属概念',model=MODEL):
+    p=prompt.split('\n')
+    question=p[0]
+    headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+               'Accept-Encoding': 'gzip, deflate',
+               'Accept-Language': 'zh-CN,zh;q=0.9',
+               'Cache-Control': 'max-age=0',
+               'Connection': 'keep-alive',
+               'Upgrade-Insecure-Requests': '1',
+               #   'If-Modified-Since': 'Thu, 11 Jan 2018 07:05:01 GMT',
+               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36'}
+
+    headers_wc = deepcopy(headers)
+    headers_wc["Referer"] = "http://www.iwencai.com/unifiedwap/unified-wap/result/get-stock-pick"
+    headers_wc["Host"] = "www.iwencai.com"
+    headers_wc["X-Requested-With"] = "XMLHttpRequest"
+
+    Question_url = "http://www.iwencai.com/unifiedwap/unified-wap/result/get-stock-pick"
+
+    payload = {
+        "question": question,
+        "perpage": 100,
+        "query_type": "stock"
+    }
+
+    try:
+        response = requests.get(Question_url, params=payload, headers=headers_wc)
+
         if response.status_code == 200:
-            df_data=parse_wencai(response.json())
-            if max==0:
-                max=df_data['max']
-            print(df_data['page'],'/',df_data['max'],response.text[:99])
-            df=pd.concat([df,df_data['df']])
+            json = response.json()
+            df_data = pd.DataFrame(json["data"]["data"])
+            # 规范返回的columns，去掉[xxxx]内容,并将重复的命名为.1.2...
+            cols = pd.Series([re.sub(r'\[[^)]*\]', '', col) for col in pd.Series(df_data.columns)])
+            for dup in cols[cols.duplicated()].unique():
+                cols[cols[cols == dup].index.values.tolist()] = [dup + '.' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
+            df_data.columns=cols
+            if len(p)>1 and len(p[1])>10:
+                df_data=df_data[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
+                return ask("『%s』\n%s"%(df_data.head(30).to_csv(index=False),p[1]),model)
+            return df_data
         else:
             print("连接访问接口失败")
-        if page==max:
-            break
-    df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
-    return df
+    except Exception as e:
+        print(e)
 
 def tencentK(mkt:str = '',symbol: str = "sh000001",period='day') -> pd.DataFrame:
     # symbol=symbol.lower()
@@ -132,69 +149,6 @@ def groupby2html(df:pd.DataFrame,key:str)->str:
                 html_table = html_table.replace('temp', f'<td rowspan={count}>{industry}</td>', 1)
     return html_table
 
-def cnHotStock(prompt:str='''移除重复股票，按炒作题材的产业链进行分类,在该csv最前面加上一列产业链，按产业链排序并输出csv''',model=MODEL,iwcToken='',count=30):
-    idx = tencentK('sh000001')
-    headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
-        'Cache-control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin': 'https://www.iwencai.com',
-        'Pragma': 'no-cache',
-        'Referer': 'https://www.iwencai.com/unifiedwap/result?w=%E4%B8%BB%E6%9D%BF%E5%8F%8A%E5%88%9B%E4%B8%9A%E6%9D%BF%EF%BC%8C%E9%9D%9EST%EF%BC%8C%E8%BF%87%E5%8E%BB90%E6%97%A5%E6%B6%A8%E5%81%9C%E6%AC%A1%E6%95%B0%3E2%EF%BC%8C%E6%89%80%E5%B1%9E%E6%A6%82%E5%BF%B5%EF%BC%8C%E6%B5%81%E9%80%9A%E5%B8%82%E5%80%BC,%E9%87%8D%E8%A6%81%E4%BA%8B%E4%BB%B6%E5%86%85%E5%AE%B9&querytype=stock&addSign=1701007281531&sign=1701008018713',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'hexin-v': 'A1mRq-g0WKv1CgQ_uM_OAv5ebk425kyBN9txHXsO1ED-XnewwzZdaMcqgeYI',
-        'sec-ch-ua': '"Google Chrome";v="119", "Chromium";v="119", "Not?A_Brand";v="24"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"macOS"',
-    }
-    data = {
-        'query': '主板及创业板，非ST，过去90日涨停次数>2，所属概念，流通市值,重要事件内容',
-        'urp_sort_way': 'desc',
-        'urp_sort_index': '最新涨跌幅',
-        'page': '1',
-        'perpage': '100',
-        'addheaderindexes': '',
-        'condition': '[{"score":0.0,"chunkedResult":"主板_&_及创业板_&_非st_&_过去90日涨停次数>2_&_所属概念_&_流通市值_&_重要事件内容","opName":"and","opProperty":"","sonSize":6,"relatedSize":"0","logid":"84055bc7ade80b8b41d3327e010e6e86","source":"text2sql"},{"dateText":"","indexName":"上市板块","indexProperties":["包含主板>-<创业板"],"ci":true,"source":"text2sql","type":"index","indexPropertiesMap":{"包含":"主板>-<创业板"},"reportType":"null","ciChunk":"主板","createBy":"preCache","uiText":"上市板块包含主板,创业板","valueType":"_上市板块","domain":"abs_股票领域","sonSize":0,"dateList":[],"order":0},{"dateText":"","indexName":"股票简称","indexProperties":["不包含st"],"ci":true,"source":"text2sql","type":"index","indexPropertiesMap":{"不包含":"st"},"reportType":"null","ciChunk":"非st","createBy":"preCache","uiText":"股票简称不包含st","valueType":"_股票简称","domain":"abs_股票领域","sonSize":0,"dateList":[],"order":0},{"dateText":"近90日","indexName":"涨停次数","indexProperties":["(2","起始交易日期 %s","截止交易日期 %s"],"ci":true,"dateUnit":"日","source":"text2sql","type":"index","isDateRange":true,"indexPropertiesMap":{"(":"2","起始交易日期":"20230714","截止交易日期":"20231124"},"reportType":"TRADE_DAILY","ciChunk":"过去90日涨停次数>2","createBy":"ner_con","dateType":"+区间","isExtend":false,"uiText":"过去90日的涨停次数大于2","valueType":"_整型数值(次|个)","domain":"abs_股票领域","sonSize":0,"order":0},{"dateText":"近90日","indexName":"所属概念","indexProperties":[],"ci":true,"source":"text2sql","type":"index","indexPropertiesMap":{},"reportType":"null","ciChunk":"所属概念","createBy":"preCache","uiText":"所属概念","valueType":"_所属概念","domain":"abs_股票领域","sonSize":0,"dateList":[],"order":0},{"dateText":"","indexName":"a股市值(不含限售股)","indexProperties":["nodate 1","交易日期 20231124"],"ci":true,"dateUnit":"日","source":"text2sql","type":"index","indexPropertiesMap":{"交易日期":"20231124","nodate":"1"},"reportType":"TRADE_DAILY","ciChunk":"流通市值","createBy":"preCache","dateType":"交易日期","isExtend":false,"uiText":"a股市值(不含限售股)","valueType":"_浮点型数值(元)","domain":"abs_股票领域","sonSize":0,"dateList":[],"order":0},{"dateText":"","indexName":"重要事件内容","indexProperties":[],"ci":true,"source":"text2sql","type":"index","indexPropertiesMap":{},"reportType":"null","ciChunk":"重要事件内容","createBy":"preCache","uiText":"重要事件内容","valueType":"_重要事件内容","domain":"abs_股票领域","sonSize":0,"dateList":[],"order":0}]'%(idx.index[-1],idx.index[-90]),
-        'codelist': '',
-        'indexnamelimit': '',
-        'ret': 'json_all',
-        'source': 'Ths_iwencai_Xuangu',
-        'date_range[0]': idx.index[-90],
-        'date_range[1]': idx.index[-1],
-        'iwc_token': iwcToken,
-        'urp_use_sort': '1',
-        'user_id': 'Ths_iwencai_Xuangu_v2a4cbw2do7nutkf3col1omxv3jpguts',
-        'uuids[0]': '24087',
-        'query_type': 'stock',
-        'comp_id': '6836372',
-        'business_cat': 'soniu',
-        'uuid': '24087',
-    }
-    df = crawl_data_from_wencai(headers,data)
-    for col in ['a股市值(不含限售股)','区间振幅','涨停次数']:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    df=df.sort_values(by=['区间振幅','涨停次数','a股市值(不含限售股)'],ascending=False)
-    df=df.drop_duplicates(subset=['股票简称','股票代码'])
-    df=df[df['重要事件名称']=='涨停']
-    df['股票代码'] = df['股票代码'].str[-2:]+df['股票代码'].str[:-3]
-    df['重要事件公告时间'] = df.apply(lambda x: str(idx.index[idx.index.get_loc(datetime.strptime(x['重要事件公告时间'], '%Y%m%d'))-x['涨停次数']]), axis=1)
-    df['重要事件内容'] = df['重要事件内容'].str.split('涨停原因：').apply(lambda x: x[-1].replace('。首板涨停。','') if x else '')
-    df['区间振幅'] = round(pd.to_numeric(df['区间振幅'], errors='coerce'))
-    df['区间振幅'] = df['区间振幅'].astype(str).str[:-2]+'%'
-    df['a股市值(不含限售股)'] = round(pd.to_numeric(df['a股市值(不含限售股)'], errors='coerce') / 100000000)
-    df['a股市值(不含限售股)'] = df['a股市值(不含限售股)'].astype(str).str[:-2]+'亿'
-    df.to_csv('testwencai.csv',index=False,encoding='utf_8_sig')
-    args=('股票简称','股票代码','重要事件公告时间','重要事件内容','a股市值(不含限售股)','区间振幅')
-    df=df[list(args)].head(count)
-    stockData= '股票名称,代码,涨停日期,炒作题材,流通市值,区间振幅\n'+'\n'.join(' '.join(x) for x in df.values.tolist()).replace(' 00:00:00','')
-    result = ask('『%s』%s'%(stockData,prompt),model)
-    return result
-
 def uplimit10jqka(date:str='20231231'):
     cookies = {
         'Hm_lvt_78c58f01938e4d85eaf619eae71b4ed1': '1640619309,1642582805',
@@ -229,4 +183,4 @@ def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
     return result
 
 # if __name__=='__main__':
-#     print(cnHotStock(iwcToken='0ac9666a17011559005045400'))
+#     print(crawl_data_from_wencai())
