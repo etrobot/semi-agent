@@ -34,7 +34,7 @@ def getUrl(url,cookie=''):
             retryTimes += 1
             continue
 
-def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，近15日涨幅>0，换手率正序，不支持融资融券，所属概念',model=MODEL):
+def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，近15日涨幅>0，换手率正序，不支持融资融券，动态市盈率，市盈率TTM，所属概念',model=MODEL):
     p=prompt.split('\n')
     question=p[0]
     headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -75,7 +75,7 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
                 if c in cols.values:
                     df[c]=pd.to_numeric(df[c], errors='coerce')
             if len(p)>1 and len(p[1])>10:
-                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)', '所属概念']]
+                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)','市盈率(pe)','市盈率(ttm)', '所属概念']]
                 df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%(int(x/100000000)))
                 return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
             return df
