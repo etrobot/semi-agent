@@ -34,7 +34,7 @@ def getUrl(url,cookie=''):
             retryTimes += 1
             continue
 
-def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，近15日涨幅>0，换手率正序，不支持融资融券，动态市盈率，市盈率TTM，所属概念',model=MODEL):
+def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，月K最低价<MA5，换手率正序，不支持融资融券，动态市盈率，TTM市盈率，所属概念，本月解禁取反',model=MODEL):
     p=prompt.split('\n')
     question=p[0]
     headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -66,16 +66,18 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
             json = response.json()
             df = pd.DataFrame(json["data"]["data"])
             # 规范返回的columns，去掉[xxxx]内容,并将重复的命名为.1.2...
-            cols = pd.Series([re.sub(r'\[[^)]*\]', '', col) for col in pd.Series(df.columns)])
+            cols = pd.Series([re.sub(r'\[[^)]*\]|\(|\)|,|pe','', col) for col in pd.Series(df.columns)])
             for dup in cols[cols.duplicated()].unique():
                 cols[cols[cols == dup].index.values.tolist()] = [dup + '.' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
             df.columns=cols
             df['股票代码'] = df['股票代码'].str[7:] + df['股票代码'].str[:6]
-            for c in ['最新价', '最新涨跌幅', 'a股市值(不含限售股)']:
-                if c in cols.values:
-                    df[c]=pd.to_numeric(df[c], errors='coerce')
+            for col in df.columns:
+                try:
+                    df[col] = pd.to_numeric(df[col]).round().astype(int)
+                except ValueError:
+                    pass
             if len(p)>1 and len(p[1])>10:
-                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅', 'a股市值(不含限售股)','市盈率(pe)','市盈率(ttm)', '所属概念']]
+                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅','市盈率(pe)','市盈率(pe,ttm)','a股市值(不含限售股)', '所属概念']]
                 df['a股市值(不含限售股)']= df['a股市值(不含限售股)'].apply(lambda x:"%s亿"%(int(x/100000000)))
                 return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
             return df
@@ -186,3 +188,25 @@ def cnHotStockLatest(prompt:str='分类产业链',model = MODEL):
     stockData='\n'.join(','.join(x) for x in df[['name', 'code', 'reason_type','high_days','currency_value']].values.tolist())
     result = ask('『%s』\n%s'%(stockData,prompt),model)
     return result
+
+def tencentNews(symbol:str):
+    params = {
+        'page': '1',
+        'symbol': symbol.lower(),
+        'n': '51',
+        '_var': 'finance_notice',
+        'type': '2',
+    }
+    response = requests.get(
+        'https://proxy.finance.qq.com/ifzqgtimg/appstock/news/info/search',
+        params = params,
+        headers={'User-Agent': 'Mozilla'}
+    )
+    news = pd.DataFrame(json.loads(response.text[len('finance_notice='):])['data']['data'])
+    news.drop_duplicates(subset='title', inplace=True)
+    news['time'] = pd.to_datetime(news['time']).dt.date
+    news = news[news['src'] != '自选股智能写手']
+    news = news[~news['title'].str.contains('股|主力|机构|资金流|家公司|异动|拉升|龙虎榜数据|%涨停')]
+    return news[['time','symbol','title','url']]
+
+# print(tencentNews('SZ001234').to_csv())
