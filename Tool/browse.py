@@ -47,6 +47,13 @@ def sumPage(url: str,model=MODEL) -> str:
         print(e)
         return ''
 
+def google(prompt:str,modle=MODEL)->str:
+    SEARCH_ENGINE_ID = os.environ['SEARCH_ENGINE']
+    API_KEY = os.environ['GOOGLE_API_KEY']
+    url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={SEARCH_ENGINE_ID}&q={prompt}&start=1"
+    data = requests.get(url).json()["items"]
+    return  '\n'.join(f'{x["title"]}\n{x["link"]}' for x in data)
+
 def search(prompt:str,model=MODEL)->str:
     details=[prompt]
     print(details)
@@ -57,7 +64,7 @@ def search(prompt:str,model=MODEL)->str:
     def ddg(searchsite=SEARCHSITE):
         if 'SEARCHSITE' in os.environ.keys():
             searchsite=os.environ['SEARCHSITE']
-        serp = ddgs.text(searchsite + ' ' + str(words), max_results=1)
+        serp = ddgs.text(searchsite + ' ' + str(words), max_results=3)
         links = [r['href'] for r in serp]
         print('search result:', links)
         pageSum = '\n'.join(sumPage(link) for link in links)
@@ -69,7 +76,7 @@ def search(prompt:str,model=MODEL)->str:
         final.append(sumSum)
         t.sleep(30)  # ddg limit
 
-    for words in details[:5]:
+    for words in details[:3]:
         print('search:', words)
         if 'SOCKSPROXY' in os.environ.keys():
             with DDGS(proxies = os.environ['SOCKSPROXY']) as ddgs:
