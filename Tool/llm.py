@@ -36,11 +36,9 @@ def genPost(prompt:str,model=MODEL):
   result=ast.literal_eval(text)
   title,tags,post=result['title'],result['tags'], result['post'].replace('  ','')
   # filename="-".join([p[0] for p in pinyin(string, style=Style.NORMAL)])
-  template = '''
----
+  template = '''---
 title: "{title}"
 date: {date}
-draft: true
 tags: {tags}
 author: {author}
 category: {cate}
@@ -50,7 +48,7 @@ category: {cate}
         title=title,
         date=datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
         tags=str(tags),
-        cate='AGENTs',
+        cate='Agents',
         author='Frank Lin',
         post=post,
     )
