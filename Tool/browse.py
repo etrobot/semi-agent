@@ -5,7 +5,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from requests.cookies import RequestsCookieJar
-from Tool.llm import summarize,make_list
+from Tool.llm import summarize, make_list, genPost
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
 
@@ -68,7 +68,7 @@ def search(prompt:str,model=MODEL)->str:
         links = [r['href'] for r in serp]
         print('search result:', links)
         pageSum = '\n'.join(sumPage(link) for link in links)
-        if len(pageSum) < 200:
+        if len(pageSum) < 2560:
             sumSum = pageSum
         else:
             sumSum = summarize(pageSum,model)
@@ -110,3 +110,6 @@ def wechatPost(url:str):
     img_tags = soup.find_all('img')
     image_urls = '\n'.join(img.get('data-src','') for img in img_tags)+'\n'
     return image_urls,queryText
+
+
+# print(genPost(search('MistralOrca 7B 13B')))

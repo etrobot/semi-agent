@@ -1,12 +1,7 @@
 import ast
 import datetime
 import json
-import re
-
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-
 from config import MODEL,KEYS
 from litellm import completion
 
@@ -37,8 +32,7 @@ def genPost(prompt:str,model=MODEL):
   }
   '''
   text=ask(prompt,model=model)
-  if not 'openai' in model:
-      text='{' + text.split('{')[-1].split('}')[0] + '}'
+  text='{' + text.split('{')[-1].split('}')[0] + '}'
   result=ast.literal_eval(text)
   title,tags,post=result['title'],result['tags'], result['post'].replace('  ','')
   # filename="-".join([p[0] for p in pinyin(string, style=Style.NORMAL)])
