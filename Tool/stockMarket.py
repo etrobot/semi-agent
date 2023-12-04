@@ -35,7 +35,7 @@ def getUrl(url,cookie=''):
             continue
 
 def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，月K最低价<MA5，换手率正序，不支持融资融券，动态市盈率，TTM市盈率，所属概念，本月解禁取反',model=MODEL):
-    p=prompt.split('\n')
+    p=prompt.split(';\n')
     question=p[0]
     headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                'Accept-Encoding': 'gzip, deflate',
