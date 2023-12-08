@@ -11,33 +11,21 @@ from config import SEARCHSITE,MODEL
 
 def sumPage(url: str,model=MODEL) -> str:
     print('Sum:',url)
-    def dealCookies(cookies):
-        cookie_jar = RequestsCookieJar()
-        for cookie in cookies:
-            cookie_jar.set(cookie['name'], cookie['value'], domain=cookie['domain'], path=cookie['path'],
-                           secure=cookie['secure'])
-        return cookie_jar
-
     headers = {
+        'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
         "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Mobile Safari/537.36"
     }
-
     session = requests.Session()
     session.headers = headers
-    try:
-      cookies = dealCookies(json.load(open('cookies.json')))
-      session.cookies.update(cookies)
-    except Exception as e:
-      print(e)
-      pass
-
+    if url.startswith('https://twitter.com'):
+        url=url.replace('https://twitter.com','https://nitter.net')
     try:
         response = session.get(url)
         print(response.text[:100])
         soup = BeautifulSoup(response.text, 'html.parser')
 
         elements = [
-            element.text for element in soup.find_all(["h1", "h2", "h3", "p"])
+            element.text for element in soup.find_all(["title","h1", "h2", "h3","li","p"])
             if len(element.text) > 5
         ]
         txt=' '.join(elements)
