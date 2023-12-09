@@ -34,7 +34,7 @@ def getUrl(url,cookie=''):
             retryTimes += 1
             continue
 
-def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，月K最低价<MA5，换手率正序，不支持融资融券，动态市盈率，TTM市盈率，所属概念，本月解禁取反',model=MODEL):
+def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1，成交额>5千万，月K最低价<MA5，换手率正序，不支持融资融券，动态市盈率，TTM市盈率，所属概念，最近一月涨停原因，本月解禁取反',model=MODEL):
     p=prompt.split(';\n')
     question=p[0]
     headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -71,13 +71,18 @@ def crawl_data_from_wencai(prompt:str='主板创业板,非ST，近20日涨停=1�
                 cols[cols[cols == dup].index.values.tolist()] = [dup + '.' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
             df.columns=cols
             df['股票代码'] = df['股票代码'].str[7:] + df['股票代码'].str[:6]
+            if '涨停原因类别' in df.columns:
+                # 使用apply方法将以"c"开头的列合并成字符串列
+                df['涨停原因'] = df.filter(regex='^涨停原因类别').apply(lambda x: ''.join(str(xx) for xx in x if xx is not None), axis=1)
+                # 删除以"c"开头的列
+                df = df.drop(df.filter(regex='^涨停原因类别').columns, axis=1)
             for col in df.columns:
                 try:
                     df[col] = pd.to_numeric(df[col]).round().astype(int)
                 except ValueError:
                     pass
             if len(p)>1 and len(p[1])>10:
-                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅','市盈率','市盈率ttm','a股市值不含限售股', '所属概念']]
+                df=df[['股票简称', '股票代码','最新价', '最新涨跌幅','市盈率','市盈率ttm','a股市值不含限售股', '涨停原因']]
                 df['a股市值不含限售股']= df['a股市值不含限售股'].apply(lambda x:"%s亿"%(int(x/100000000)))
                 return ask("『%s』\n%s"%(df.head(30).to_csv(index=False),p[1]),model)
             return df
@@ -209,4 +214,5 @@ def tencentNews(symbol:str):
     news = news[~news['title'].str.contains('股|主力|机构|资金流|家公司|异动|拉升|龙虎榜数据|%涨停')]
     return news[['time','symbol','title','url']]
 
-# print(tencentNews('SZ001234').to_csv())
+# df=crawl_data_from_wencai()
+# df.to_csv('test.csv',index=False,encoding='utf_8_sig')
