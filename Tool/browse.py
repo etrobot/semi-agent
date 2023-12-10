@@ -1,14 +1,14 @@
 import os
 import re
 import time as t
-import json
+from datetime import datetime,timedelta
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from requests.cookies import RequestsCookieJar
-from Tool.llm import summarize, make_list, genPost
+from Tool.llm import summarize, make_list, ask
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
-
+from feedparser import parse
 def sumPage(url: str,model=MODEL) -> str:
     print('Sum:',url)
     headers = {
@@ -99,5 +99,24 @@ def wechatPost(url:str):
     image_urls = '\n'.join(img.get('data-src','') for img in img_tags)+'\n'
     return image_urls,queryText
 
+def get_rss_df(rss_url:str):
+    feed = parse(rss_url)
+    df = pd.json_normalize(feed.entries)
+    try:
+        df['published'] = pd.to_datetime(df['published'], format='mixed').dt.tz_convert('Asia/Shanghai')
+        return df
+    except ValueError as e:
+        print(f"Error parsing date: {e}")
+    return df
 
-# print(genPost(search('MistralOrca 7B 13B')))
+def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter='nitter.io.lol',model=MODEL):
+    rss_url=f'https://{nitter}/{user}/rss'
+    df=get_rss_df(rss_url)
+    df['conent']=df['published'].dt.strftime('%y/%m/%d')+df['author']+df['summary']
+    tweets=df['conent'].to_csv().replace(nitter,'x.com')[:length]
+    prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
+    print('tweets:',prompt)
+    result=ask(prompt,model=model)
+    return result
+
+# print(sumTweets('i/lists/1733652180576686386'))
