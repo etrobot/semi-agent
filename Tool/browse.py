@@ -102,17 +102,12 @@ def wechatPost(url:str):
 def get_rss_df(rss_url:str):
     feed = parse(rss_url)
     df = pd.json_normalize(feed.entries)
-    try:
-        df['published'] = pd.to_datetime(df['published'], format='mixed',errors='coerce', utc=True).dt.tz_convert('Asia/Shanghai')
-        return df
-    except ValueError as e:
-        print(f"Error parsing date: {e}")
     return df
 
 def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter='nitter.io.lol',model=MODEL):
     rss_url=f'https://{nitter}/{user}/rss'
     df=get_rss_df(rss_url)
-    df['conent']=df['published'].dt.strftime('%y/%m/%d')+df['author']+df['summary']
+    df['conent']=df['published'].str[len('Sun, '):-len(' 06:20:57 GMT')]+df['author']+df['summary']
     tweets=df['conent'].to_csv().replace(nitter,'x.com')[:length]
     prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
     print('tweets:',prompt)
