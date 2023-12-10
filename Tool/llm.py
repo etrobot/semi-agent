@@ -24,7 +24,7 @@ def make_list(prompt:str,subList=False,model=MODEL):
     print(reply_text.split('\n'))
     return [x for x in reply_text.split('\n') if len(x)>2 and sum(int(y in x) for y in prompt)>0]
 
-def genPost(prompt:str,model=MODEL):
+def genPost(prompt:str,category='INFO',model=MODEL):
   prompt+='''\n\nTurn texts above to a blog post,output python dict format:{
     "title":"title",
     "tags":["tag1","tag2",...],
@@ -39,6 +39,7 @@ def genPost(prompt:str,model=MODEL):
   template = '''---
 title: "{title}"
 date: {date}
+draft: true
 tags: {tags}
 author: {author}
 category: {cate}
@@ -48,7 +49,7 @@ category: {cate}
         title=title,
         date=datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
         tags=str(tags),
-        cate='Agents',
+        cate=category,
         author='Frank Lin',
         post=post,
     )
