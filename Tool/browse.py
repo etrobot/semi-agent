@@ -103,7 +103,7 @@ def get_rss_df(rss_url:str):
     feed = parse(rss_url)
     df = pd.json_normalize(feed.entries)
     try:
-        df['published'] = pd.to_datetime(df['published'], format='mixed').dt.tz_convert('Asia/Shanghai')
+        df['published'] = pd.to_datetime(df['published'], format='mixed',errors='coerce', utc=True).dt.tz_convert('Asia/Shanghai')
         return df
     except ValueError as e:
         print(f"Error parsing date: {e}")
