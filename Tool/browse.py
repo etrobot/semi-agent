@@ -109,7 +109,7 @@ def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingo
     df=get_rss_df(rss_url)
     df['conent']=df['published'].str[len('Sun, '):-len(' 06:20:57 GMT')]+df['author']+df['summary']
     tweets=df['conent'].to_csv().replace(nitter,'x.com')[:length]
-    prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
+    prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』的自我宣传和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
     print('tweets:',prompt)
     result=ask(prompt,model=model)
     return result
