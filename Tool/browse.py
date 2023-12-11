@@ -9,7 +9,7 @@ from Tool.llm import summarize, make_list, ask
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
 from feedparser import parse
-def sumPage(url: str,model=MODEL) -> str:
+def sumPage(url: str,model=MODEL,raw=False) -> str:
     print('Sum:',url)
     headers = {
         'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
@@ -17,19 +17,20 @@ def sumPage(url: str,model=MODEL) -> str:
     }
     session = requests.Session()
     session.headers = headers
-    if url.startswith('https://twitter.com'):
-        url=url.replace('https://twitter.com','https://nitter.net')
+    if url.startswith('https://twitter.com') or url.startswith('https://x.com'):
+        url=url.replace('https://twitter.com','https://n.biendeo.com/').replace('https://x.com','https://n.biendeo.com/')
     try:
         response = session.get(url)
         print(response.text[:100])
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        elements = [
-            element.text for element in soup.find_all(["title","h1", "h2", "h3","li","p"])
-            if len(element.text) > 5
-        ]
-        txt=' '.join(elements)
-        return summarize(txt,model)
+        if not raw:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            elements = [
+                element.text for element in soup.find_all(["title", "h1", "h2", "h3", "li", "p"])
+                if len(element.text) > 5
+            ]
+            txt = ' '.join(elements)
+            return summarize(txt,model)
+        return response.text
 
     except Exception as e:
         print(e)
@@ -104,14 +105,36 @@ def get_rss_df(rss_url:str):
     df = pd.json_normalize(feed.entries)
     return df
 
-def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter='nitter.io.lol',model=MODEL):
+def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter='nitter.io.lol',minutes=720,model=MODEL):
     rss_url=f'https://{nitter}/{user}/rss'
     df=get_rss_df(rss_url)
-    df['conent']=df['published'].str[len('Sun, '):-len(' 06:20:57 GMT')]+df['author']+df['summary']
-    tweets=df['conent'].to_csv().replace(nitter,'x.com')[:length]
+    try:
+        df['timestamp'] = df['published'].apply(lambda x: pd.Timestamp(x).timestamp())
+        compareTime = datetime.now() - timedelta(minutes=minutes)
+        compareTime = pd.Timestamp(compareTime).timestamp()
+        df = df[df['timestamp'] > compareTime]
+        if len(df)==0:
+            return df
+    except Exception as e:
+        print(e)
+    for k,v in df.iterrows():
+        pattern = r'<a\s+.*?href="([^"]*http://nitter\.io\.lol/[^/]+/status/[^"]*)"[^>]*>'
+        matches = re.findall(pattern, v['summary'])
+        if len(matches)>0:
+            if matches[0] in df['id'].values:
+                indices = df[df['id'] == matches[0]]
+                df.at[k, 'summary'] = re.sub(pattern,  "<blockquote>%s</blockquote>" % indices['summary'].values[0], v['summary'])
+                df=df.drop(indices.index)
+            else:
+                oripost = sumPage(url=matches[0], raw=True)
+                quote = BeautifulSoup(oripost, 'html.parser').title.string.replace(" | nitter", '')
+                df.at[k,'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
+    df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+')' + df['summary']
+    df.to_csv('test.csv', index=False)
+    tweets=df['content'].to_csv().replace(nitter,'x.com')[:length]
     prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』的自我宣传和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
     print('tweets:',prompt)
     result=ask(prompt,model=model)
     return result
 
-# print(sumTweets('i/lists/1733652180576686386'))
+# print(sumTweets('i/lists/1733652180576686386',minutes=25))
