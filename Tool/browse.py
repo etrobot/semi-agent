@@ -134,38 +134,44 @@ def get_rss_df(rss_url:str):
     df = pd.json_normalize(feed.entries)
     return df
 
-def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str='nitter.io.lol',minutes:int=720,mail:bool=True,model=MODEL):
-    rss_url=f'https://{nitter}/{user}/rss'
-    df=get_rss_df(rss_url)
-    try:
-        df['timestamp'] = df['published'].apply(lambda x: pd.Timestamp(x).timestamp())
-        compareTime = datetime.now() - timedelta(minutes=minutes)
-        compareTime = pd.Timestamp(compareTime).timestamp()
-        df = df[df['timestamp'] > compareTime]
-        if len(df)==0:
-            return df
-    except Exception as e:
-        print(e)
-    for k,v in df.iterrows():
-        pattern = r'<a\s+.*?href="([^"]*http://nitter\.io\.lol/[^/]+/status/[^"]*)"[^>]*>'
-        matches = re.findall(pattern, v['summary'])
-        if len(matches)>0:
-            if matches[0] in df['id'].values:
-                indices = df[df['id'] == matches[0]]
-                df.at[k, 'summary'] = re.sub(pattern,  "<blockquote>%s</blockquote>" % indices['summary'].values[0], v['summary'])
-                df=df.drop(indices.index)
-            else:
-                oripost = sumPage(url=matches[0], raw=True)
-                quote = BeautifulSoup(oripost, 'html.parser').title.string.replace(" | nitter", '')
-                df.at[k,'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
-    df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+'): ' + df['summary']
-    df.to_csv('test.csv', index=False)
-    tweets=df['content'].to_csv().replace(nitter,'x.com')[:length]
-    prompt=tweets+f"\n以上是一些推特节选，您是中文专栏『{info}最新资讯』的资深作者，请抽取『{info}』相关的信息，包括发推日期、作者(若有)、推特链接(若有)和推特内容，然后重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章，如果没有请回复『NOT FOUND』"
-    print('tweets:',prompt)
-    result=ask(prompt,model=model)
-    if mail and not 'NOT FOUND' in result:
+def sumTweets(users:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str='nitter.io.lol',minutes:int=720,mail:bool=True,model=MODEL):
+      result=''
+      for user in users.split(';'):
+        rss_url=f'https://{nitter}/{user}/rss'
+        df=get_rss_df(rss_url)
+        if not 'i/lists' in user:
+            df = df.reindex(index=df.index[::-1])
+        try:
+            df['timestamp'] = df['published'].apply(lambda x: pd.Timestamp(x).timestamp())
+            compareTime = datetime.utcnow() - timedelta(minutes=minutes)
+            compareTime = pd.Timestamp(compareTime).timestamp()
+            df = df[df['timestamp'] > compareTime]
+            if len(df)==0:
+                continue
+        except Exception as e:
+            print(e)
+        if 'i/lists' in user:
+            for k,v in df.iterrows():
+                pattern = r'<a\s+.*?href="([^"]*http://nitter\.io\.lol/[^/]+/status/[^"]*)"[^>]*>'
+                matches = re.findall(pattern, v['summary'])
+                if len(matches)>0:
+                    if matches[0] in df['id'].values:
+                        indices = df[df['id'] == matches[0]]
+                        df.at[k, 'summary'] = re.sub(pattern,  "<blockquote>%s</blockquote>" % indices['summary'].values[0], v['summary'])
+                        df=df.drop(indices.index)
+                    else:
+                        oripost = sumPage(url=matches[0], raw=True)
+                        quote = BeautifulSoup(oripost, 'html.parser').title.string.replace(" | nitter", '')
+                        df.at[k,'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
+        df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+'): ' + df['summary']
+        df.to_csv('test.csv', index=False)
+        tweets=df['content'].to_csv().replace(nitter,'x.com')[:length]
+        prompt=tweets+f"\n以上是一些推特节选，您是中文专栏『{info}最新资讯』的资深作者，请抽取『{info}』相关的信息，包括发推日期、作者(若有)、推特链接(若有)和推特内容，然后重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章，如果没有请回复『NOT FOUND』"
+        print('tweets:',prompt)
+        if not 'NOT FOUND' in result:
+            result=result+ask(prompt,model=model)
+      if mail and len(result)>0:
         sendEmail(markdown(result))
-    return result
+      return result
 
-# print(sumTweets('i/lists/1733652180576686386',minutes=2500,mail=True))
+# print(sumTweets('i/lists/1733652180576686386;rowancheung',minutes=280,mail=True))
