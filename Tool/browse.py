@@ -9,7 +9,36 @@ from Tool.llm import summarize, make_list, ask
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
 from feedparser import parse
-def sumPage(url: str,model=MODEL,raw=False) -> str:
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+from markdown import markdown
+
+def sendEmail(message:str,receiver:str=os.environ['MAILTO'],subject:str=''):
+    if len(message)==0:
+        return
+    message=message.replace('<td','<td style="border:1px solid grey;"').replace('<table','<table style="border-collapse:collapse;"')
+    subject=datetime.now().strftime('%Y年%m月%d日')+subject
+    sender = 'acephi@163.com' #发送的邮箱
+    receiver = receiver.split(';')  #要接受的邮箱（注:测试中发送其他邮箱会提示错误）
+    smtpserver = 'smtp.163.com'
+    username = 'acephi' #你的邮箱账号
+    password = os.environ['MAIL'] #你的邮箱密码
+    msg = MIMEText(message,'html','utf-8') #中文需参数‘utf-8'，单字节字符不需要
+    msg['Subject'] = Header(subject, 'utf-8') #邮件主题
+    msg['from'] = sender    #自己的邮件地址
+    smtp = smtplib.SMTP()
+    try :
+        smtp.connect(smtpserver) # 链接
+        smtp.login(username, password) # 登陆
+        smtp.sendmail(sender, receiver, msg.as_string()) #发送
+        print('邮件发送成功')
+    except smtplib.SMTPException:
+        print('邮件发送失败')
+    smtp.quit() # 结束
+
+
+def sumPage(url: str,model=MODEL,raw:bool=False) -> str:
     print('Sum:',url)
     headers = {
         'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
@@ -105,7 +134,7 @@ def get_rss_df(rss_url:str):
     df = pd.json_normalize(feed.entries)
     return df
 
-def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter='nitter.io.lol',minutes=720,model=MODEL):
+def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str='nitter.io.lol',minutes:int=720,mail:bool=True,model=MODEL):
     rss_url=f'https://{nitter}/{user}/rss'
     df=get_rss_df(rss_url)
     try:
@@ -129,12 +158,14 @@ def sumTweets(user:str='elonmusk',info:str='人工智能',lang:str='中文',ingo
                 oripost = sumPage(url=matches[0], raw=True)
                 quote = BeautifulSoup(oripost, 'html.parser').title.string.replace(" | nitter", '')
                 df.at[k,'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
-    df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+')' + df['summary']
+    df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+'): ' + df['summary']
     df.to_csv('test.csv', index=False)
     tweets=df['content'].to_csv().replace(nitter,'x.com')[:length]
-    prompt=tweets+f"\n以上是一些推特节选，而你是中文专栏『{info}最新资讯』的资深作者，忽略推中的『{user}，{ingores}』的自我宣传和重复的信息，抽取『{info}』相关的信息，含发推日期、@作者(若有)和链接(若有)，并重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章"
+    prompt=tweets+f"\n以上是一些推特节选，您是中文专栏『{info}最新资讯』的资深作者，请抽取『{info}』相关的信息，包括发推日期、作者(若有)、推特链接(若有)和推特内容，然后重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章，如果没有请回复『NOT FOUND』"
     print('tweets:',prompt)
     result=ask(prompt,model=model)
+    if mail and not 'NOT FOUND' in result:
+        sendEmail(markdown(result))
     return result
 
-# print(sumTweets('i/lists/1733652180576686386',minutes=25))
+# print(sumTweets('i/lists/1733652180576686386',minutes=2500,mail=True))
