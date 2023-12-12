@@ -1,15 +1,18 @@
 import ast
 import datetime
 import json
+import os
+
 import pandas as pd
 from config import MODEL,KEYS
 from litellm import completion
 
 def ask(prompt:str,model=MODEL):
-    return completion(model=model, messages=[{
-        "role": "user",
-        "content": prompt,
-    }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+    if 'API_BASE_URL' in os.environ.keys() and 'openai' in model:
+        return completion(model=model, messages=[{"role": "user","content": prompt,}], api_key=KEYS[model],
+                          api_base=os.environ['API_BASE_URL'])["choices"][0]["message"]["content"]
+    return completion(model=model, messages=[{"role": "user", "content": prompt, }], api_key=KEYS[model])["choices"][0]["message"]["content"]
+
 def summarize(text:str,model=MODEL):
     print(len(text))
     if len(text)<100:
