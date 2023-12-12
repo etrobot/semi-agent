@@ -86,5 +86,3 @@ def genPlan(prompt:str,model=MODEL)->str:
     filename='agentMission%s.csv'%datetime.datetime.now().strftime('%Y%m%d-%H_%M')
     df.to_csv(filename, index=False, encoding='utf_8_sig')
     return filename
-
-print(ask('hello'))
