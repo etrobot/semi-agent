@@ -12,7 +12,6 @@ from feedparser import parse
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
-from markdown import markdown
 
 def sendEmail(message:str,receiver:str=os.environ['MAILTO'],subject:str=''):
     if len(message)==0:
@@ -48,16 +47,18 @@ def sumPage(url: str,model=MODEL,raw:bool=False) -> str:
     session.headers = headers
     if url.startswith('https://twitter.com') or url.startswith('https://x.com'):
         url=url.replace('https://twitter.com','https://n.biendeo.com/').replace('https://x.com','https://n.biendeo.com/')
+    else:
+        url="http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):]
     try:
         response = session.get(url)
-        print(response.text[:100])
         if not raw:
             soup = BeautifulSoup(response.text, 'html.parser')
             elements = [
-                element.text for element in soup.find_all(["title", "h1", "h2", "h3", "li", "p"])
+                element.text for element in soup.find_all(["title", "h1", "h2", "h3", "li", "p","a"])
                 if len(element.text) > 5
             ]
             txt = ' '.join(elements)
+            print(len(txt),'/',len(response.text),url)
             return summarize(txt,model)
         return response.text
 
