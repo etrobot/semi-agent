@@ -10,7 +10,7 @@ from litellm import completion
 def ask(prompt:str,model=MODEL):
     if 'API_BASE_URL' in os.environ.keys() and 'openai' in model:
         return completion(model=model, messages=[{"role": "user","content": prompt,}], api_key=KEYS[model],
-                          api_base=os.environ['API_BASE_URL'])["choices"][0]["message"]["content"]
+                          base_url=os.environ['API_BASE_URL'])["choices"][0]["message"]["content"]
     return completion(model=model, messages=[{"role": "user", "content": prompt, }], api_key=KEYS[model])["choices"][0]["message"]["content"]
 
 def summarize(text:str,model=MODEL):
@@ -86,3 +86,5 @@ def genPlan(prompt:str,model=MODEL)->str:
     filename='agentMission%s.csv'%datetime.datetime.now().strftime('%Y%m%d-%H_%M')
     df.to_csv(filename, index=False, encoding='utf_8_sig')
     return filename
+
+print(ask('hello'))
