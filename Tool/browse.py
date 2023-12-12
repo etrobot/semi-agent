@@ -168,7 +168,7 @@ def sumTweets(users:str='elonmusk',info:str='人工智能',lang:str='中文',ing
         if not 'NOT FOUND' in result:
             result=result+ask(prompt,model=model)
       if mail and len(result)>0:
-        sendEmail(markdown(result))
+        sendEmail(result)
       return result
 
 # print(sumTweets('i/lists/1733652180576686386;elonmusk',minutes=600,mail=True))
