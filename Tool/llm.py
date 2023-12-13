@@ -13,11 +13,11 @@ def ask(prompt:str,model=MODEL):
                           base_url=os.environ['API_BASE_URL'])["choices"][0]["message"]["content"]
     return completion(model=model, messages=[{"role": "user", "content": prompt, }], api_key=KEYS[model])["choices"][0]["message"]["content"]
 
-def summarize(text:str,model=MODEL):
+def summarize(text:str,model=MODEL,lang='English'):
     print(len(text))
     if len(text)<100:
         return text
-    return ask('『%s』TLDR;'%text,model=model)
+    return ask(f'『{text}』TLDR; Summarize key points with {lang}',model=model)
 
 def make_list(prompt:str,subList=False,model=MODEL):
     suffix =' Output points with index'

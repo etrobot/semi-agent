@@ -37,20 +37,21 @@ def sendEmail(message:str,receiver:str=os.environ['MAILTO'],subject:str=''):
     smtp.quit() # 结束
 
 
-def sumPage(url: str,model=MODEL,raw:bool=False) -> str:
+def sumPage(url: str,model=MODEL,lang='English',raw:bool=False) -> str:
     print('Sum:',url)
     headers = {
         'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Mobile Safari/537.36"
     }
     session = requests.Session()
     session.headers = headers
     if url.startswith('https://twitter.com') or url.startswith('https://x.com'):
         url=url.replace('https://twitter.com','https://n.biendeo.com/').replace('https://x.com','https://n.biendeo.com/')
-    else:
-        url="http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):]
     try:
-        response = session.get(url)
+        response = session.get("http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):])
+        if '<p><b>404.</b> <ins>That’s an error.</ins>' in response.text:
+            headers['User-Agent']="Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Mobile Safari/537.36"
+            session.headers = headers
+            response = session.get(url)
         if not raw:
             soup = BeautifulSoup(response.text, 'html.parser')
             elements = [
@@ -59,7 +60,7 @@ def sumPage(url: str,model=MODEL,raw:bool=False) -> str:
             ]
             txt = ' '.join(elements)
             print(len(txt),'/',len(response.text),url)
-            return summarize(txt,model)
+            return summarize(txt,model,lang)
         return response.text
 
     except Exception as e:
