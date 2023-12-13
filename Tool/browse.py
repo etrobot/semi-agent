@@ -37,17 +37,19 @@ def sendEmail(message:str,receiver:str=os.environ['MAILTO'],subject:str=''):
     smtp.quit() # 结束
 
 
-def sumPage(url: str,model=MODEL,lang='English',raw:bool=False) -> str:
+def sumPage(url: str,model=MODEL,lang='English',raw:bool=False,nitter=os.environ['NITTER']) -> str:
     print('Sum:',url)
     headers = {
         'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
     }
     session = requests.Session()
     session.headers = headers
-    if url.startswith('https://twitter.com') or url.startswith('https://x.com'):
-        url=url.replace('https://twitter.com','https://n.biendeo.com/').replace('https://x.com','https://n.biendeo.com/')
     try:
-        response = session.get("http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):])
+        if url.startswith('https://twitter.com') or url.startswith('https://x.com'):
+            url = url.replace('https://twitter.com', nitter).replace('https://x.com', nitter)
+            response = session.get(url)
+        else:
+            response = session.get("http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):])
         if '<p><b>404.</b> <ins>That’s an error.</ins>' in response.text:
             headers['User-Agent']="Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Mobile Safari/537.36"
             session.headers = headers
@@ -136,7 +138,7 @@ def get_rss_df(rss_url:str):
     df = pd.json_normalize(feed.entries)
     return df
 
-def sumTweets(users:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str='nitter.io.lol',minutes:int=720,mail:bool=True,model=MODEL):
+def sumTweets(users:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str=os.environ['NITTER'],minutes:int=720,mail:bool=True,model=MODEL):
       result=''
       for user in users.split(';'):
         rss_url=f'https://{nitter}/{user}/rss'
