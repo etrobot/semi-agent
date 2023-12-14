@@ -5,7 +5,8 @@ from datetime import datetime,timedelta
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from Tool.llm import summarize, make_list, ask
+from Tool.llm import summarize, make_list
+from litellm import completion
 from duckduckgo_search import DDGS
 from config import SEARCHSITE,MODEL
 from feedparser import parse
@@ -51,10 +52,14 @@ def sumPage(url: str,model=MODEL,lang='English',raw:bool=False,nitter=os.environ
             response = session.get(url)
         else:
             response = session.get("http://webcache.googleusercontent.com/search?q=cache:"+url[len('https://'):])
-        if '404' in response.text and len(response.text)<2000:
+        if '404' in response.text or 'recaptcha' in response.text and len(response.text)<2500:
             response = session.get(url)
         if not raw:
             soup = BeautifulSoup(response.text, 'html.parser')
+            if 'google-cache-hdr' in response.text:
+                divs = soup.find_all('div', id=re.compile('.*google-cache-hdr.*'))
+                for div in divs:
+                    div.decompose()
             elements = [
                 element.text for element in soup.find_all(["title", "h1", "h2", "h3", "li", "p","a"])
                 if len(element.text) > 5
@@ -137,41 +142,53 @@ def get_rss_df(rss_url:str):
     df = pd.json_normalize(feed.entries)
     return df
 
-def sumTweets(users:str='elonmusk',info:str='人工智能',lang:str='中文',ingores:str="webinar",length:int=4000,nitter:str=os.environ['NITTER'],minutes:int=720,mail:bool=True,model=MODEL):
-      result=''
-      for user in users.split(';'):
-        rss_url=f'https://{nitter}/{user}/rss'
-        df=get_rss_df(rss_url)
+def sumTweets(users: str = 'elonmusk', info: str = '人工智能', lang: str = '中文', ingores: str = "webinar",
+              length: int = 4000, nitter: str = os.environ['NITTER'], minutes: int = 720, mail: bool = True,
+              model='gpt-3.5-turbo-1106'):
+    result = ''
+    for user in users.split(';'):
+        rss_url = f'https://{nitter}/{user}/rss'
+        feed = parse(rss_url)
+        df = pd.json_normalize(feed.entries)
         df['timestamp'] = df['published'].apply(lambda x: pd.Timestamp(x).timestamp())
         if not 'i/lists' in user:
             df = df.reindex(index=df.index[::-1])
         compareTime = datetime.utcnow() - timedelta(minutes=minutes)
         compareTime = pd.Timestamp(compareTime).timestamp()
         df = df[df['timestamp'] > compareTime]
-        if len(df)==0:
+        if len(df) == 0:
             continue
-        for k,v in df.iterrows():
-            pattern = r'<a\s+.*?href="([^"]*http://nitter\.io\.lol/[^/]+/status/[^"]*)"[^>]*>'
+        for k, v in df.iterrows():
+            pattern = r'<a\s+.*?href="([^"]*https://%s/[^/]+/status/[^"]*)"[^>]*>'%nitter.replace(".",'\.')
             matches = re.findall(pattern, v['summary'])
-            if len(matches)>0:
+            if len(matches) > 0:
                 if matches[0] in df['id'].values:
                     indices = df[df['id'] == matches[0]]
-                    df.at[k, 'summary'] = re.sub(pattern,  "<blockquote>%s</blockquote>" % indices['summary'].values[0], v['summary'])
+                    df.at[k, 'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % indices['summary'].values[0],
+                                                 v['summary'])
                     if 'i/lists' in user:
-                        df=df.drop(indices.index)
+                        df = df.drop(indices.index)
                 else:
-                    oripost = sumPage(url=matches[0], raw=True)
+                    headers = {
+                        'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en-US;q=0.7,en;q=0.6,ja;q=0.5',
+                        'User-Agent': "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Mobile Safari/537.36"
+                    }
+                    session = requests.Session()
+                    session.headers = headers
+                    oripost = session.get(matches[0]).text
                     quote = BeautifulSoup(oripost, 'html.parser').title.string.replace(" | nitter", '')
-                    df.at[k,'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
-        df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] +'['+df['author']+']'+'('+df['id'].str.replace(nitter,'x.com')+'): ' + df['summary']
+                    df.at[k, 'summary'] = re.sub(pattern, "<blockquote>%s</blockquote>" % quote, v['summary'])
+        df['content'] = df['published'].str[len('Sun, '):-len(' GMT')] + '[' + df['author'] + ']' + '(' + df[
+            'id'].str.replace(nitter, 'x.com') + '): ' + df['summary']
         df.to_csv('test.csv', index=False)
-        tweets=df['content'].to_csv().replace(nitter,'x.com')[:length]
-        prompt=tweets+f"\n以上是一些推特节选，您是中文专栏『{info}最新资讯』的资深作者，请抽取『{info}』相关的信息，包括发推日期、作者(若有)、推特链接(若有)和推特内容，然后重新写成{lang}专栏文章，最后输出一篇用markdown排版的{lang}文章，如果没有{info}🇭🇰资讯请回复『NOT FOUND』"
-        print('tweets:',prompt)
+        tweets = df['content'].to_csv().replace(nitter, 'x.com')[:length]
+        prompt = tweets + f"\n以上是一些推特节选，您是中文专栏『{info}最新资讯』的资深作者，请将以上推文中『{info}』相关的信息，包括发推日期、作者(若有)、推特链接(若有)和推特内容，重新写成一篇用markdown排版的{lang}文章，如果没有{info}🇭🇰资讯请回复『NOT FOUND』"
+        print('tweets:', prompt)
         if not 'NOT FOUND' in result:
-            result=result+ask(prompt,model=model)
-      if mail and len(result)>0:
+            result = result + completion(model='openai/gpt-3.5-turbo-1106', messages=[{"role": "user", "content": prompt, }], api_key=os.environ['OPENAI_API_KEY'],
+                       base_url=os.environ['API_BASE_URL'])["choices"][0]["message"]["content"]
+    if mail and len(result) > 0:
         sendEmail(result)
-      return result
+    return result
 
 # print(sumTweets('i/lists/1733652180576686386;elonmusk',minutes=600,mail=True))

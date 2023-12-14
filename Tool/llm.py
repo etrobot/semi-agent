@@ -17,7 +17,7 @@ def summarize(text:str,model=MODEL,lang='English'):
     print(len(text))
     if len(text)<100:
         return text
-    return ask(f'『{text}』TLDR; Summarize key points with {lang}',model=model)
+    return ask(f'『{text}』TLDR; Use {lang} to describe key points',model=model)
 
 def make_list(prompt:str,subList=False,model=MODEL):
     suffix =' Output points with index'
