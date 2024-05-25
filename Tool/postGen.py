@@ -112,8 +112,9 @@ def send2turso(df: pd.DataFrame):
 
     # Ensure table exists
     create_table_sql = """
-    CREATE TABLE IF NOT EXISTS article (
+    CREATE TABLE IF NOT EXISTS note (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        link TEXT NOT NULL,
         title TEXT NOT NULL,
         tags TEXT,
         dark INTEGER NOT NULL DEFAULT 0,
@@ -121,7 +122,8 @@ def send2turso(df: pd.DataFrame):
         content TEXT NOT NULL,
         createdAt REAL NOT NULL DEFAULT (strftime('%s','now')),
         updatedAt REAL DEFAULT (strftime('%s','now')),
-        authorId TEXT NOT NULL
+        authorId TEXT NOT NULL,
+        usedcount INTEGER NOT NULL DEFAULT 0
     );
     """
     conn.execute(create_table_sql)
@@ -140,7 +142,7 @@ def send2turso(df: pd.DataFrame):
         # Generate tweet-style content and tags
         tweet_content, tags = generate_tweet_style_content_and_tags(title, description)
         insert_sql = """
-        INSERT INTO article (title, tags, dark, css, content, createdAt, updatedAt, authorId) 
+        INSERT INTO note (title, tags, dark, css, content, createdAt, updatedAt, authorId) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         """
         conn.execute(insert_sql, (title, tags, dark, css, tweet_content, created_at, updated_at, author_id))
