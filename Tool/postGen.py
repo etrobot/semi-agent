@@ -5,6 +5,7 @@ import os,urllib3,json
 from dotenv import load_dotenv, find_dotenv
 import datetime
 import random
+import ast
 
 
 def get_random_gradient(dark=0):
@@ -54,8 +55,8 @@ def generate_tweet_style_content_and_tags(title: str, description: str) -> (str,
     """Generate tweet-style content and tags using OpenAI GPT-4 API."""
     prompt = (
         f"Convert the following title and description into a tweet-style content "
-        f"and categorize the product. Output should be a Python dictionary format "
-        f"with keys 'content' and 'tags':\n\n"
+        f"and categorize the product. Output should be only a Python dictionary "
+        f"with keys 'content' ,'category'(one of [fashion, food, beauty, digital, other]) and 'tags':\n\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
         f"Output:"
@@ -67,7 +68,7 @@ def generate_tweet_style_content_and_tags(title: str, description: str) -> (str,
     }
 
     data = {
-        "model": "gpt-4",
+        "model": "gpt-4o",
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
@@ -88,27 +89,25 @@ def generate_tweet_style_content_and_tags(title: str, description: str) -> (str,
     # Log the generated content for debugging
     print(f"Generated content: {content}")
 
-    try:
-        output_dict = eval(content)  # Evaluate the string as a Python expression
-        tweet_content = output_dict.get('content', '').strip()
-        tags = output_dict.get('tags', [])
-        if isinstance(tags, list):
-            tags = ','.join(tags)
-        else:
-            tags = str(tags)
-    except Exception as e:
-        print(f"Error parsing the generated content: {e}")
-        tweet_content = content
-        tags = "general"
+    output_dict = ast.literal_eval(content.strip('```python').strip())  # Evaluate the string as a Python expression
+    print(output_dict)
+    tweet_content = output_dict.get('content', '').strip()
+    tags = output_dict.get('tags', [])
+    category = output_dict.get('category', 'Uncategorized').strip()
+    if isinstance(tags, list):
+        tags = ','.join(tags)
+    else:
+        tags = str(tags)
 
-    return tweet_content, tags
+
+    return tweet_content, category, tags
 
 
 def send2turso(df: pd.DataFrame):
     """Send DataFrame entries to the Turso database."""
     url = os.getenv("TURSO_DATABASE_URL")
     auth_token = os.getenv("TURSO_AUTH_TOKEN")
-    conn = libsql.connect("next-articles.db", sync_url=url, auth_token=auth_token)
+    conn = libsql.connect("notes.db", sync_url=url, auth_token=auth_token)
 
     # Ensure table exists
     create_table_sql = """
@@ -116,8 +115,10 @@ def send2turso(df: pd.DataFrame):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         link TEXT NOT NULL,
         title TEXT NOT NULL,
+        category TEXT,
         tags TEXT,
         dark INTEGER NOT NULL DEFAULT 0,
+        textalign INTEGER NOT NULL DEFAULT 0,
         css TEXT,
         content TEXT NOT NULL,
         createdAt REAL NOT NULL DEFAULT (strftime('%s','now')),
@@ -131,7 +132,9 @@ def send2turso(df: pd.DataFrame):
     # Insert DataFrame data into the database
     for index, row in df.iterrows():
         title = row.get('title', 'No Title')
+        link = row.get('link', '')
         dark = random.choice([0, 1])
+        textalign = random.choice([0, 1, 2])
         css = get_random_gradient(dark)
         description = row.get('description', '')
         created_at = datetime.datetime.strptime(row.get('published', datetime.datetime.utcnow().isoformat()),
@@ -140,12 +143,12 @@ def send2turso(df: pd.DataFrame):
         author_id = 987654321
 
         # Generate tweet-style content and tags
-        tweet_content, tags = generate_tweet_style_content_and_tags(title, description)
+        tweet_content,category,tags = generate_tweet_style_content_and_tags(title, description)
         insert_sql = """
-        INSERT INTO note (title, tags, dark, css, content, createdAt, updatedAt, authorId) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO note (link, title, category, tags, dark, textalign, css, content, createdAt, updatedAt, authorId) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
-        conn.execute(insert_sql, (title, tags, dark, css, tweet_content, created_at, updated_at, author_id))
+        conn.execute(insert_sql, (link, title, category, tags, dark, textalign, css, tweet_content, created_at, updated_at, author_id))
 
     conn.commit()
 
