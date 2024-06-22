@@ -71,9 +71,9 @@ def get_category():
     url = os.getenv("TURSO_DATABASE_URL")
     auth_token = os.getenv("TURSO_AUTH_TOKEN")
     conn = libsql.connect("notes.db", sync_url=url, auth_token=auth_token)
-    # 获取category表所有数据
-    result = conn.execute("SELECT * FROM category")
-    rows = result.fetchall()
+    # conn.execute("REPLACE INTO category('listId','category') VALUES ('1733652180576686386','AI');")
+    # conn.commit()
+    rows=conn.execute("select * from category").fetchall()
     return rows
 
 def fetch_avatar_data(list_id):
@@ -119,14 +119,13 @@ def fetch_avatar_data(list_id):
     if len(results) > 0:
         conn = libsql.connect("notes.db", sync_url=os.getenv("TURSO_DATABASE_URL"),
                               auth_token=os.getenv("TURSO_AUTH_TOKEN"))
-        cursor = conn.cursor()
-        cursor.execute('''
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS avatars (
                 twitterId TEXT PRIMARY KEY,
                 imgSrc TEXT NOT NULL
             )
             ''')
-        cursor.executemany('''
+        conn.executemany('''
                 INSERT OR REPLACE INTO avatars (twitterId, imgSrc) VALUES (?, ?)
                 ''', results)
         conn.commit()
@@ -321,30 +320,32 @@ def dealAnswer(answer:str):
             print(checkstring.split("```")[0])
             return json.loads(checkstring.split("```")[0])
 
-def comment(rss_url: str, length: int = 10):
+def comment(list_id: str,cate:str, length: int = 10):
+    rss_url= f'http://{os.environ["LOCALHOST"]}:8080/i/lists/{list_id}?key={os.environ["NITTER_RSS_KEY"]}'
+
     feed = parse(rss_url)
     entry_list = [f'[{e.published} {e.author}:]({e.link}) {e.title}' for e in feed.entries if
                   not e.title.startswith('RT by @') and not e.title.startswith('R to @')]
     rss = '\n\n'.join(entry_list[:length])
     instruct = 'pick the most creative idea from the tweets above, and make a question or praise to comment it with emoji, output in json format like [{"tweetUrl":"url1","comment":"xxx"},{"tweetUrl":"url1","comment":"xxx"}...]'
     prompt = rss + '\n\n' + instruct
-    # comments = None
-    # try:
-    #     answer = coze2api(prompt)
-    #     print(answer)
-    #     comments = dealAnswer(answer)
-    # except Exception as e:
-    #     print('coze2api error', e)
-    #     pass
-    #
-    # if comments is None:
-    #     try:
-    #         answer = chat2api(prompt)
-    #         print(answer)
-    #         comments =  dealAnswer(answer)
-    #     except Exception as e:
-    #         print('chat2api error', e)
-    #         pass
+    comments = None
+    try:
+        answer = coze2api(prompt)
+        print(answer)
+        comments = dealAnswer(answer)
+    except Exception as e:
+        print('coze2api error', e)
+        pass
+
+    if comments is None:
+        try:
+            answer = chat2api(prompt)
+            print(answer)
+            comments =  dealAnswer(answer)
+        except Exception as e:
+            print('chat2api error', e)
+            pass
     answer = llm(prompt)
     comments = dealAnswer(answer)
     comment_dict = {comment['tweetUrl']: comment['comment'] for comment in comments}
@@ -363,10 +364,16 @@ def rss2turso(url: str):
     df = get_rss_df(url)
     send2turso(df)
 
+def run():
+    listId = "1733652180576686386"
+    cate = ''
+    cates = get_category()
+    for row in cates:
+        if (row[0] == listId):
+            cate = row[1]
+            break
+    comment(listId,cate,5)
 
 # Example usage
 if __name__ == '__main__':
-    # print(get_avatar("OpenAIDevs","1733652180576686386"))
-    categories = get_category()
-    for category in categories:
-        print(category)
+    run()
